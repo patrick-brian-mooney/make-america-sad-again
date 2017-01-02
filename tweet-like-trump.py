@@ -30,6 +30,8 @@ data_store = '%s/TrumpTweets_data.pkl' % base_dir
 
 markov_length = 2
 
+programmer_twitter_id = 'patrick_mooney'    # That's me, the author of this script
+
 
 def _get_data_store():
     """Internal function to get the entire stored data dictionary. If the data
@@ -169,8 +171,6 @@ def massage_tweets(the_tweets):
 
 def save_tweets(the_tweets):
     """Save the text from THE_TWEETS to a text file, and update the stored data.
-
-
     THE_TWEETS is a list of Tweets.
     """
     if len(the_tweets) == 0:        # If there are no new tweets, don't do anything
@@ -179,25 +179,38 @@ def save_tweets(the_tweets):
         f.writelines(['%s\n' % tweet.text for tweet in the_tweets])
     set_data_value('last_update_date', datetime.datetime.now())     # then, update the database of tweet-record filenames and ID numbers
 
-def update_database_if_necessary():
+def update_tweet_collection_if_necessary():
+    """Once in a while, import new tweets that The Donald & his team 
+    """
     if len(glob.glob('%s/tweets/*txt' % base_dir)) == 0 or (datetime.datetime.now() - get_last_update_date()).days > 9:
         t = get_new_tweets(screen_name='realDonaldTrump', oldest = get_newest_tweet_id())
         t = massage_tweets(t)
         save_tweets(t)
 
 def get_tweet(starts, the_mapping):
+    """Produces a tweet by repeatedly calling the text generator with varying
+    parameters until it coughs up something in the right length range. 
+    """
     the_tweet = ' ' * 160
     while len(the_tweet) not in range(20,141):
-        if debugging: print("Generating a tweet ...", end="")
-        the_tweet = sg.gen_text(the_mapping, starts, markov_length=markov_length, sentences_desired=random.choice(range(1,4)))
+        sents = random.choice(range(2,5))
+        if debugging: print("Generating a tweet (%d sentences) ..." % sents, end="")
+        the_tweet = sg.gen_text(the_mapping, starts, markov_length=markov_length, sentences_desired=sents)
         if debugging: print(" length is %d" % len(the_tweet))
     return the_tweet
-    
+
+def set_up():
+    """Perform pre-tweeting tasks. Currently (as of 1 Jan 2017), it just updates the
+    collection of stored tweets, but in the future it will check for other types of
+    things, like user interaction.
+    """
+    update_tweet_collection_if_necessary()
+
 
 if __name__ == '__main__':
-    update_database_if_necessary()
-    the_words = [][:]
+    set_up()
+    donnies_words = [][:]
     for the_file in glob.glob('%s/tweets/*txt' % base_dir):
-        the_words += sg.word_list(the_file)
-    starts, the_mapping = sg.buildMapping(the_words, markov_length=markov_length)
+        donnies_words += sg.word_list(the_file)
+    starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
     print(get_tweet(starts, the_mapping))
