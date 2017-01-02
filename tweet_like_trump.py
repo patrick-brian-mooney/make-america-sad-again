@@ -93,7 +93,6 @@ def get_API():
     global the_API
     if not the_API:
         the_API = _get_API()
-    assert the_API is not None
     return the_API
 
 def get_new_tweets(screen_name='realDonaldTrump', oldest=-1):
