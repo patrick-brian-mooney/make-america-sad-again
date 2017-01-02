@@ -24,6 +24,7 @@ import text_handling as th              # https://github.com/patrick-brian-moone
 
 
 debugging = True
+force_download = False                  # Set to True to always re-download tweets.
 
 base_dir = '/TrumpTweets'
 data_store = '%s/TrumpTweets_data.pkl' % base_dir
@@ -31,6 +32,8 @@ data_store = '%s/TrumpTweets_data.pkl' % base_dir
 markov_length = 2
 
 programmer_twitter_id = 'patrick_mooney'    # That's me, the author of this script
+
+the_API = None
 
 
 def _get_data_store():
@@ -41,8 +44,12 @@ def _get_data_store():
         with open(data_store, 'rb') as the_data_file:
             return pickle.load(the_data_file)
     except Exception:
-        if debugging: print('WARNING: Data store does not exist, creating ...')
-        the_data = {'purpose': 'data store for TrumpTweets', 'program author': 'Patrick Mooney'}
+        if debugging: th.print_indented('WARNING: Data store does not exist, creating ...')
+        the_data = {'purpose': 'data store for TrumpTweets',
+                    'program author': 'Patrick Mooney',
+                    'script URL': 'https://github.com/patrick-brian-mooney/make-america-sad-again',
+                    'author twitter ID': '@patrick_mooney',
+                   }
         with open(data_store, 'wb') as the_data_file:
             pickle.dump(the_data, the_data_file)
         return the_data
@@ -69,21 +76,32 @@ def get_data_value(keyname):
     try:
         return _get_data_store()[keyname]
     except KeyError:
-        if debugging: print('WARNING: attempted to get undefined data key "%s"; initializing to None' % keyname)
+        if debugging: th.print_indented('WARNING: attempted to get undefined data key "%s"; initializing to None' % keyname)
         set_data_value(keyname, None)
         return None
+
+def _get_API():
+    """Get an instance of the Tweepy API object to work with.
+    """
+    auth = tweepy.OAuthHandler(Trump_client['consumer_key'], Trump_client['consumer_secret'])
+    auth.set_access_token(Trump_client['access_token'], Trump_client['access_token_secret'])
+    return tweepy.API(auth)
+        
+def get_API():
+    """Return the global variable the_API after (if necessary) initializing it.
+    """
+    global the_API
+    if not the_API:
+        the_API = _get_API()
+    assert the_API is not None
+    return the_API
 
 def get_new_tweets(screen_name='realDonaldTrump', oldest=-1):
     """Get those tweets newer than the tweet whose ID is specified as the OLDEST
     parameter from the account SCREEN_NAME.
     """
-    # set up the Twitter API
-    auth = tweepy.OAuthHandler(Trump_client['consumer_key'], Trump_client['consumer_secret'])
-    auth.set_access_token(Trump_client['access_token'], Trump_client['access_token_secret'])
-    api = tweepy.API(auth)
-
     # get most recent tweets (200 is maximum possible at once)
-    new_tweets = api.user_timeline(screen_name=screen_name, count=200)
+    new_tweets = get_API().user_timeline(screen_name=screen_name, count=200)
     ret = new_tweets.copy()
 
     oldest_tweet = ret[-1].id - 1   # save the id of the tweet before the oldest tweet
@@ -91,10 +109,11 @@ def get_new_tweets(screen_name='realDonaldTrump', oldest=-1):
     # keep grabbing tweets until there are no tweets left
     while len(new_tweets) > 0:
         if debugging: print("getting all tweets before ID #%s" % (oldest_tweet), end='')
-        new_tweets = api.user_timeline(screen_name = screen_name, count=200, max_id=oldest_tweet)
+        new_tweets = get_API().user_timeline(screen_name = screen_name, count=200, max_id=oldest_tweet)
         ret.extend(new_tweets)
         oldest_tweet = ret[-1].id - 1
         if debugging: print("    ...%s tweets downloaded so far" % (len(ret)))
+    set_data_value('newest_tweet_id', max([t.id for t in ret]))
     return [t for t in ret if (t.id > oldest)]
 
 def get_newest_tweet_id():
@@ -112,6 +131,15 @@ def get_last_update_date():
         return get_data_value('last_update_date') or datetime.datetime.min
     except Exception:
         return datetime.datetime.min
+
+def get_newest_mention_id():
+    """Return the ID of the most recent @mention the program is aware of and has
+    dealt with.
+    """
+    try:
+        return get_data_value('last_mention_id') or -1
+    except Exception:
+        return -1
 
 def filter_tweet(tweet_text):
     """Returns True if the tweet should be filtered (i.e., eliminated), False if it
@@ -179,10 +207,18 @@ def save_tweets(the_tweets):
         f.writelines(['%s\n' % tweet.text for tweet in the_tweets])
     set_data_value('last_update_date', datetime.datetime.now())     # then, update the database of tweet-record filenames and ID numbers
 
-def update_tweet_collection_if_necessary():
-    """Once in a while, import new tweets that The Donald & his team 
+def _num_tweet_files():
+    """Convenience function to return the number of files in which The Donald's
+    tweets are stored.
     """
-    if len(glob.glob('%s/tweets/*txt' % base_dir)) == 0 or (datetime.datetime.now() - get_last_update_date()).days > 9:
+    return len(glob.glob('%s/tweets/*txt' % base_dir))
+
+def update_tweet_collection_if_necessary():
+    """Once in a while, import new tweets encoding the brilliance that The Donald &
+    his team have graced the world by sharing. 
+    """
+    if _num_tweet_files == 0 or (datetime.datetime.now() - get_last_update_date()).days > 30 or random.random() < 0.03 or force_download:
+        if debugging: print("INFO: updating tweet collection")
         t = get_new_tweets(screen_name='realDonaldTrump', oldest = get_newest_tweet_id())
         t = massage_tweets(t)
         save_tweets(t)
@@ -196,8 +232,60 @@ def get_tweet(starts, the_mapping):
         sents = random.choice(range(2,5))
         if debugging: print("Generating a tweet (%d sentences) ..." % sents, end="")
         the_tweet = sg.gen_text(the_mapping, starts, markov_length=markov_length, sentences_desired=sents)
-        if debugging: print(" length is %d" % len(the_tweet))
+        if debugging: th.print_indented(" length is %d" % len(the_tweet))
     return the_tweet
+
+def tweet(text):
+    """Post a tweet. Currently, it doesn't actually do so; it just prints it to stdout. 
+    """
+    th.print_indented(text)
+    
+def post_reply(text, user_id, tweet_id):
+    """Post a reply tweet. TWEET_ID is the id of the tweet that this tweet is a reply
+    to; the USER_ID is the person to whom we are replying, and the user_id is
+    automatically prepended to the beginning of TEXT before posting.
+    
+    Currently does not actually post the tweet, but just prints to stdout. 
+    """
+    if debugging: th.print_indented("INFO: posting tweet: @%s %s  ----  in reply to tweet ID# %d" % (user_id, text, tweet_id))    
+    # get_API().update_status("@%s %s" % (user_id, text), in_reply_to_status_id = tweet_id)
+
+def modified_retweet(text, user_id, tweet_id):
+    if debugging: th.print_indented("%s\n\nhttps://twitter.com/%s/status/%s" % (text, user_id, tweet_ID))
+    # get_API().update_status("%s\n\nhttps://twitter.com/%s/status/%s" % (text, user_id, tweet_ID))
+
+def process_command(command, issuer_id, tweet_id):
+    """Process a command coming from my own twitter account.
+    """
+    command_parts = [c.strip().lower() for c in command.strip().split()]
+    if command_parts[0] in ['stop', 'quiet', 'silence']:
+        set_data_value('stopped', True)
+        post_reply('You got it, sir, halting tweets per your command.', user_id=issuer_id, tweet_id=tweet_id)
+    elif command_parts[0] in ['start', 'verbose', 'go', 'loud', 'begin']:
+        set_data_value('stopped', False)
+        post_reply('Yessir, beginning tweeting again per your command.', user_id=issuer_id, tweet_id=tweet_id)     
+    else:
+        post_reply("Sorry, sir. I didn't understand that.", user_id=issuer_id, tweet_id=tweet_id)     
+
+def handle_mention(mention):
+    """Process the mention in whatever way is appropriate.
+    """
+    if debugging:
+        th.print_indented("INFO: Handling mention ID #%d" % mention.id)
+        th.print_indented("  text is: %s" % mention.text)
+        th.print_indented("  user is: @%s" % mention.user.screen_name)
+    if mention.user.screen_name.strip('@').lower() == programmer_twitter_id.strip('@').lower():
+        process_command(mention.text, issuer_id=programmer_twitter_id, tweet_id=mention.id)
+    elif mention.user.screen_name.strip('@').lower().strip() == 'realdonaldtrump':
+        if debugging: print("Oh my! The Donald is speaking")
+        modified_retweet('LOL\n\n', user_id="realDonaldTrump", tweet_id=mention.id)
+
+def check_mentions():
+    """A stub to check for any @mentions and, if necessary, reply to them.
+    """
+    for mention in [m for m in get_API().mentions_timeline(count=100) if m.id > get_newest_mention_id()]:
+        handle_mention(mention)
+        set_data_value('last_mention_id', max(mention.id, get_newest_mention_id()))
 
 def set_up():
     """Perform pre-tweeting tasks. Currently (as of 1 Jan 2017), it just updates the
@@ -205,12 +293,16 @@ def set_up():
     things, like user interaction.
     """
     update_tweet_collection_if_necessary()
+    check_mentions()
 
 
 if __name__ == '__main__':
+    if get_data_value('stopped'):
+        if debugging: th.print_indented('Aborting: user data key "stopped" is set.')
+        sys.exit(0)
     set_up()
     donnies_words = [][:]
     for the_file in glob.glob('%s/tweets/*txt' % base_dir):
         donnies_words += sg.word_list(the_file)
     starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
-    print(get_tweet(starts, the_mapping))
+    tweet(get_tweet(starts, the_mapping))
