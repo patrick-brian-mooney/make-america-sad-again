@@ -3,7 +3,17 @@
 
 """A script to download Donald Trump's recent tweets and filter them in ways that
 create a textual archive suitable for using for my Make America Sad! Again
-Twitter parody account.
+Twitter parody account. It maintains a list of tweets it has seen after
+massaging them and posts tweets to the MAS!A account; it also has some limited
+abilities to engage in interactions with other accounts.
+
+This script is PRE-ALPHA SOFTWARE, and certainly contains many defects, some of
+which may be series. The author accepts no liability for the effects of running
+this script on your computer.
+
+This program is copyright by Patrick Mooney; it is free software, licensed
+under the GPL, either version 3 or (at your option) any later version. See the
+file LICENSE.md for details.
 """
 
 
@@ -115,30 +125,27 @@ def get_new_tweets(screen_name='realDonaldTrump', oldest=-1):
     set_data_value('newest_tweet_id', max([t.id for t in ret]))
     return [t for t in ret if (t.id > oldest)]
 
+def get_key_value_with_default(key_name, default=None):
+    try:
+        return get_data_value(key_name) or default
+    except Exception:
+        return default
+
 def get_newest_tweet_id():
     """Get the ID of the newest tweet that has been received and massaged.
     """
-    try:
-        return get_data_value('newest_tweet_id') or -1
-    except Exception:
-        return -1
+    return get_key_value_with_default('newest_tweet_id', default=-1)
         
 def get_last_update_date():
     """Get the last time that the database was updated.
     """
-    try:
-        return get_data_value('last_update_date') or datetime.datetime.min
-    except Exception:
-        return datetime.datetime.min
+    return get_key_value_with_default('last_update_date', default=datetime.datetime.min)
 
 def get_newest_mention_id():
     """Return the ID of the most recent @mention the program is aware of and has
     dealt with.
     """
-    try:
-        return get_data_value('last_mention_id') or -1
-    except Exception:
-        return -1
+    return get_key_value_with_default('last_mention_id', default=-1)
 
 def filter_tweet(tweet_text):
     """Returns True if the tweet should be filtered (i.e., eliminated), False if it
