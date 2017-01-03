@@ -24,7 +24,7 @@ import text_handling as th              # https://github.com/patrick-brian-moone
 
 
 debugging = True
-force_download = False                  # Set to True to always re-download tweets.
+force_download = False                  # Set to True to always update tweets .
 
 base_dir = '/TrumpTweets'
 data_store = '%s/TrumpTweets_data.pkl' % base_dir
@@ -44,8 +44,8 @@ def _get_data_store():
         with open(data_store, 'rb') as the_data_file:
             return pickle.load(the_data_file)
     except Exception:
-        if debugging: th.print_wrapped('WARNING: Data store does not exist, creating ...')
-        the_data = {'purpose': 'data store for TrumpTweets',
+        if debugging: th.print_wrapped('WARNING: Data store does not exist or cannot be read, creating ...')
+        the_data = {'purpose': 'data store for the TrumpTweets project at @MakeAmericaSad!Again',
                     'program author': 'Patrick Mooney',
                     'script URL': 'https://github.com/patrick-brian-mooney/make-america-sad-again',
                     'author twitter ID': '@patrick_mooney',
