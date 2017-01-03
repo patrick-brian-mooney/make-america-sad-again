@@ -8,7 +8,7 @@ massaging them and posts tweets to the MAS!A account; it also has some limited
 abilities to engage in interactions with other accounts.
 
 This script is PRE-ALPHA SOFTWARE, and certainly contains many defects, some of
-which may be series. The author accepts no liability for the effects of running
+which may be serious. The author accepts no liability for the effects of running
 this script on your computer.
 
 This program is copyright by Patrick Mooney; it is free software, licensed
@@ -66,7 +66,7 @@ def _get_data_store():
 
 def set_data_value(keyname, value):
     """Store a VALUE, by KEYNAME, in the persistent data store. This data store is
-    read from disk, modified, and immediately written back to disk. This is a 
+    read from disk, modified, and immediately written back to disk. This is a
     naive function that doesn't worry about multiple simultaneous attempts to
     access the store: there should never be any. (This script should be the only
     process accessing the file, and there should only be one invocation running
@@ -81,7 +81,7 @@ def get_data_value(keyname):
     """Retrieves a configuration variable from the data_store file. Not meant to be
     easily user-editable. If the KEYNAME is not in the data store, adds a KEYNAME
     entry with value None and returns None. If it modifies the data store in this
-    way, it then writes the data store back to disk. 
+    way, it then writes the data store back to disk.
     """
     try:
         return _get_data_store()[keyname]
@@ -96,7 +96,7 @@ def _get_new_API():
     auth = tweepy.OAuthHandler(Trump_client['consumer_key'], Trump_client['consumer_secret'])
     auth.set_access_token(Trump_client['access_token'], Trump_client['access_token_secret'])
     return tweepy.API(auth)
-        
+
 def get_API():
     """Return the global variable the_API after (if necessary) initializing it.
     """
@@ -135,7 +135,7 @@ def get_newest_tweet_id():
     """Get the ID of the newest tweet that has been received and massaged.
     """
     return get_key_value_with_default('newest_tweet_id', default=-1)
-        
+
 def get_last_update_date():
     """Get the last time that the database was updated.
     """
@@ -155,7 +155,7 @@ def filter_tweet(tweet_text):
     account other than @realDonaldTrump (i.e., when The Donald talks about, or to,
     anyone else -- we don't want this account interacting with people just because
     The Donald does. The Donald is a terrible model for appropriate behavior).
-    
+
     However, there may need to be more nuanced behavior in the future.
     """
     if 't.co' in tweet_text:    # All URLs coming from Twitter contain Twitter's redirection domain.
@@ -174,7 +174,7 @@ def normalize(the_tweet):
     in the order they appear in the list, until none of them produces a change.
     HTML/XML entities are also unescaped, and any necessary other transformations
     are applied.
-    
+
     THE_TWEET is a Tweepy tweet object, not a string.
     """
     substitution_list = [['\n', ' '],               # Newline to space
@@ -196,7 +196,7 @@ def normalize(the_tweet):
         for which_replacement in substitution_list:
             the_tweet.text = the_tweet.text.replace(which_replacement[0], which_replacement[1])
         changed = ( orig_tweet != the_tweet.text )
-    the_tweet.text = html.unescape(the_tweet.text)    
+    the_tweet.text = html.unescape(the_tweet.text)
     return the_tweet
 
 def massage_tweets(the_tweets):
@@ -223,19 +223,23 @@ def _num_tweet_files():
     """
     return len(glob.glob('%s/tweets/*txt' % base_dir))
 
+def update_tweet_collection():
+    """Update the tweet collection."""
+    if debugging: print("INFO: updating tweet collection")
+    t = get_new_tweets(screen_name='realDonaldTrump', oldest=get_newest_tweet_id())
+    t = massage_tweets(t)
+    save_tweets(t)
+
 def update_tweet_collection_if_necessary():
     """Once in a while, import new tweets encoding the brilliance that The Donald &
-    his team have graced the world by sharing. 
+    his team have graced the world by sharing.
     """
     if _num_tweet_files == 0 or (datetime.datetime.now() - get_last_update_date()).days > 30 or random.random() < 0.03 or force_download:
-        if debugging: print("INFO: updating tweet collection")
-        t = get_new_tweets(screen_name='realDonaldTrump', oldest = get_newest_tweet_id())
-        t = massage_tweets(t)
-        save_tweets(t)
+        update_tweet_collection()
 
 def get_tweet(starts, the_mapping):
     """Produces a tweet by repeatedly calling the text generator with varying
-    parameters until it coughs up something in the right length range. 
+    parameters until it coughs up something in the right length range.
     """
     the_tweet = ' ' * 160
     while len(the_tweet) not in range(20,141):
@@ -246,18 +250,18 @@ def get_tweet(starts, the_mapping):
     return the_tweet
 
 def tweet(text):
-    """Post a tweet. Currently, it doesn't actually do so; it just prints it to stdout. 
+    """Post a tweet. Currently, it doesn't actually do so; it just prints it to stdout.
     """
     th.print_indented(text)
-    
+
 def post_reply(text, user_id, tweet_id):
     """Post a reply tweet. TWEET_ID is the id of the tweet that this tweet is a reply
     to; the USER_ID is the person to whom we are replying, and the user_id is
     automatically prepended to the beginning of TEXT before posting.
-    
-    Currently does not actually post the tweet, but just prints to stdout. 
+
+    Currently does not actually post the tweet, but just prints to stdout.
     """
-    if debugging: th.print_wrapped("INFO: posting tweet: @%s %s  ----  in reply to tweet ID# %d" % (user_id, text, tweet_id))    
+    if debugging: th.print_wrapped("INFO: posting tweet: @%s %s  ----  in reply to tweet ID# %d" % (user_id, text, tweet_id))
     # get_API().update_status("@%s %s" % (user_id, text), in_reply_to_status_id = tweet_id)
 
 def modified_retweet(text, user_id, tweet_id):
@@ -273,9 +277,12 @@ def process_command(command, issuer_id, tweet_id):
         post_reply('You got it, sir, halting tweets per your command.', user_id=issuer_id, tweet_id=tweet_id)
     elif command_parts[0] in ['start', 'verbose', 'go', 'loud', 'begin']:
         set_data_value('stopped', False)
-        post_reply('Yessir, beginning tweeting again per your command.', user_id=issuer_id, tweet_id=tweet_id)     
+        post_reply('Yessir, beginning tweeting again per your command.', user_id=issuer_id, tweet_id=tweet_id)
+    elif command_parts[0] in ['update', 'refresh']:
+        update_tweet_collection()
+        post_reply('You got it, sir: tweet collection updated.', user_id=issuer_id, tweet_id=tweet_id)
     else:
-        post_reply("Sorry, sir. I didn't understand that.", user_id=issuer_id, tweet_id=tweet_id)     
+        post_reply("Sorry, sir. I didn't understand that.", user_id=issuer_id, tweet_id=tweet_id)
 
 def handle_mention(mention):
     """Process the mention in whatever way is appropriate.
