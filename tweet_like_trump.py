@@ -18,6 +18,8 @@ file LICENSE.md for details.
 
 
 import datetime
+import sys
+import pprint
 import glob
 import random
 import html
@@ -142,6 +144,11 @@ def get_newest_mention_id():
     """
     return get_key_value_with_default('last_mention_id', default=-1)
 
+def get_newest_dm_id():
+    """Returns the ID of the most recently seen DM.
+    """
+    return get_key_value_with_default('last_dm_id', default=-1)
+
 def filter_tweet(tweet_text):
     """Returns True if the tweet should be filtered (i.e., eliminated), False if it
     should not be filtered (i.e., should remain in the list).
@@ -179,10 +186,12 @@ def normalize(the_tweet):
                          ['U. S.', 'U․S․'],         # Periods to one-dot leaders, remove spaces
                          ['U.S.', 'U․S․'],          # Periods to one-dot leaders
                          ['P․M․', 'P․M․'],          # Again
+                         ['A․M․', 'A․M․'],          # Again
                          ['V.P.', 'V․P․'],          # Again
                          ['Mr.', 'Mr․'],            # Again
                          ['Dr.', 'Dr․'],            # Again
                          ['Mrs.', 'Mrs․'],          # Again
+                         ['Ms.', 'Ms․'],            # Again
                          ['Rev.', 'Rev․'],          # Again
                         ]
     changed = True              # Be sure to run at least once.
@@ -260,8 +269,17 @@ def post_reply(text, user_id, tweet_id):
     # the_API.update_status("@%s %s" % (user_id, text), in_reply_to_status_id = tweet_id)
 
 def modified_retweet(text, user_id, tweet_id):
+    """Tweet a message about another status update.
+    """
     if debugging: th.print_wrapped("%s\n\nhttps://twitter.com/%s/status/%s" % (text, user_id, tweet_ID))
     # the_API.update_status("%s\n\nhttps://twitter.com/%s/status/%s" % (text, user_id, tweet_ID))
+
+def send_DM(text, user):
+    """Send a direct message to another user. Currently, this method is only used to
+    reply to DMs sent by other users. Does not currently do anything.
+    """
+    if debugging: th.print_wrapped("DM @%s: %s" % (user, text))
+    # the_API.send_direct_message(user, text)
 
 def process_command(command, issuer_id, tweet_id):
     """Process a command coming from my own twitter account.
@@ -269,15 +287,17 @@ def process_command(command, issuer_id, tweet_id):
     command_parts = [c.strip().lower() for c in command.strip().split()]
     if command_parts[0] in ['stop', 'quiet', 'silence']:
         set_data_value('stopped', True)
-        post_reply('You got it, sir, halting tweets per your command.', user_id=issuer_id, tweet_id=tweet_id)
+        send_DM('You got it, sir, halting tweets per your command.', user=issuer_id)
+        if debugging: th.print_wrapped('INFO: aborting run because command "%s" was issued.' % command_parts[0])
+        sys.exit(0)
     elif command_parts[0] in ['start', 'verbose', 'go', 'loud', 'begin']:
         set_data_value('stopped', False)
-        post_reply('Yessir, beginning tweeting again per your command.', user_id=issuer_id, tweet_id=tweet_id)
-    elif command_parts[0] in ['update', 'refresh']:
+        send_DM('Yessir, beginning tweeting again per your command.', user=issuer_id)
+    elif command_parts[0] in ['update', 'refresh', 'check', 'reload', 'new']:
         update_tweet_collection()
-        post_reply('You got it, sir: tweet collection updated.', user_id=issuer_id, tweet_id=tweet_id)
+        send_DM('You got it, sir: tweet collection updated.', user=issuer_id)
     else:
-        post_reply("Sorry, sir. I didn't understand that.", user_id=issuer_id, tweet_id=tweet_id)
+        send_DM("Sorry, sir. I didn't understand that.", user=issuer_id)
 
 def handle_mention(mention):
     """Process the mention in whatever way is appropriate.
@@ -303,6 +323,30 @@ def check_mentions():
         handle_mention(mention)
         set_data_value('last_mention_id', max(mention.id, get_newest_mention_id()))
 
+def handle_dm(direct_message):
+    """Handle a given direct message. Currently, it just treats any DM from me as a
+    command, and replies to anyone else with an explanation that it doesn't
+    respond usefully to DMs.
+    """
+    if debugging:
+        th.print_wrapped("INFO: Handling direct message ID #%d" % direct_message.id)
+        th.print_indented("text is: %s" % direct_message.text)
+        th.print_indented("user is: @%s" % direct_message.user.screen_name)
+    if direct_message.user.screen_name.lower().strip('@') == programmer_twitter_id.lower().strip('@'):
+        process_command(direct_message.text, issuer_id=programmer_twitter_id, tweet_id=direct_message.id)
+    else:
+        if debugging:
+            th.print_wrapped("WARNING: unhandled DM detected:")
+            pprint.pprint(direct_message)
+            th.print_wrapped("Replying with default message")
+        send_DM("Sorry, I'm a bot and don't understand how to deal with direct messages. If you need to reach my human minder, tweet at @patrick_mooney.", user=direct_message.user.screen_name) 
+
+def check_DMs():
+    """Check and handle any direct messages.
+    """
+    for dm in [dm for dm in the_API.direct_messages(count=100, full_text=True, since_id=get_newest_dm_id()) if dm.id > get_newest_dm_id()]:
+        handle_dm(dm) 
+
 def set_up():
     """Perform pre-tweeting tasks. Currently (as of 1 Jan 2017), it just updates the
     collection of stored tweets, but in the future it will check for other types of
@@ -310,6 +354,7 @@ def set_up():
     """
     update_tweet_collection_if_necessary()
     check_mentions()
+#    check_DMs()
 
 
 if __name__ == '__main__':
