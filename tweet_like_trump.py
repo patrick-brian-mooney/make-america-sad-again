@@ -42,8 +42,18 @@ data_store = '%s/TrumpTweets_data.pkl' % base_dir
 markov_length = 2
 
 programmer_twitter_id = 'patrick_mooney'    # That's me, the author of this script
+target_twitter_id = 'realDonaldTrump'       # That's the person whose tweets we're monitoring and imitating.
+my_twitter_id = 'herr_drumpf'               # That's the Twitter username under which the script posts.
 
-the_API = None
+
+def _get_new_API():
+    """Get an instance of the Tweepy API object to work with.
+    """
+    auth = tweepy.OAuthHandler(Trump_client['consumer_key'], Trump_client['consumer_secret'])
+    auth.set_access_token(Trump_client['access_token'], Trump_client['access_token_secret'])
+    return tweepy.API(auth)
+
+the_API = _get_new_API()
 
 
 def _get_data_store():
@@ -90,35 +100,20 @@ def get_data_value(keyname):
         set_data_value(keyname, None)
         return None
 
-def _get_new_API():
-    """Get an instance of the Tweepy API object to work with.
-    """
-    auth = tweepy.OAuthHandler(Trump_client['consumer_key'], Trump_client['consumer_secret'])
-    auth.set_access_token(Trump_client['access_token'], Trump_client['access_token_secret'])
-    return tweepy.API(auth)
-
-def get_API():
-    """Return the global variable the_API after (if necessary) initializing it.
-    """
-    global the_API
-    if not the_API:
-        the_API = _get_new_API()
-    return the_API
-
-def get_new_tweets(screen_name='realDonaldTrump', oldest=-1):
+def get_new_tweets(screen_name=target_twitter_id, oldest=-1):
     """Get those tweets newer than the tweet whose ID is specified as the OLDEST
     parameter from the account SCREEN_NAME.
     """
     # get most recent tweets (200 is maximum possible at once)
-    new_tweets = get_API().user_timeline(screen_name=screen_name, count=200)
+    new_tweets = the_API.user_timeline(screen_name=screen_name, count=200)
     ret = new_tweets.copy()
 
     oldest_tweet = ret[-1].id - 1   # save the id of the tweet before the oldest tweet
 
     # keep grabbing tweets until there are no tweets left
-    while len(new_tweets) > 0:
+    while len(new_tweets) > 0 and oldest < new_tweets[0].id:
         if debugging: print("getting all tweets before ID #%s" % (oldest_tweet), end='')
-        new_tweets = get_API().user_timeline(screen_name = screen_name, count=200, max_id=oldest_tweet)
+        new_tweets = the_API.user_timeline(screen_name = screen_name, count=200, max_id=oldest_tweet)
         ret.extend(new_tweets)
         oldest_tweet = ret[-1].id - 1
         if debugging: print("    ...%s tweets downloaded so far" % (len(ret)))
@@ -163,7 +158,7 @@ def filter_tweet(tweet_text):
     elif '@' in tweet_text:     # Since more than one @mention can occur in a tweet ...
         at_mentions = list(set([w for w in tweet_text.split() if '@' in w]))   # Make a list of all unique @mentions
         if len(at_mentions) == 1:
-            return not (th.strip_leading_and_trailing_punctuation(at_mentions[0].strip()).strip().lower() == 'realdonaldtrump')
+            return not (th.strip_leading_and_trailing_punctuation(at_mentions[0].strip()).strip().lower() == target_twitter_id.strip().lower())
         else:                   # Filter out tweets mentioning more than one person:
             return True         # by def'n, they're not just The Donald being self-aggrandizing.
     return False
@@ -226,7 +221,7 @@ def _num_tweet_files():
 def update_tweet_collection():
     """Update the tweet collection."""
     if debugging: print("INFO: updating tweet collection")
-    t = get_new_tweets(screen_name='realDonaldTrump', oldest=get_newest_tweet_id())
+    t = get_new_tweets(screen_name=target_twitter_id, oldest=get_newest_tweet_id())
     t = massage_tweets(t)
     save_tweets(t)
 
@@ -262,11 +257,11 @@ def post_reply(text, user_id, tweet_id):
     Currently does not actually post the tweet, but just prints to stdout.
     """
     if debugging: th.print_wrapped("INFO: posting tweet: @%s %s  ----  in reply to tweet ID# %d" % (user_id, text, tweet_id))
-    # get_API().update_status("@%s %s" % (user_id, text), in_reply_to_status_id = tweet_id)
+    # the_API.update_status("@%s %s" % (user_id, text), in_reply_to_status_id = tweet_id)
 
 def modified_retweet(text, user_id, tweet_id):
     if debugging: th.print_wrapped("%s\n\nhttps://twitter.com/%s/status/%s" % (text, user_id, tweet_ID))
-    # get_API().update_status("%s\n\nhttps://twitter.com/%s/status/%s" % (text, user_id, tweet_ID))
+    # the_API.update_status("%s\n\nhttps://twitter.com/%s/status/%s" % (text, user_id, tweet_ID))
 
 def process_command(command, issuer_id, tweet_id):
     """Process a command coming from my own twitter account.
@@ -293,9 +288,9 @@ def handle_mention(mention):
         th.print_indented("user is: @%s" % mention.user.screen_name)
     if mention.user.screen_name.strip('@').lower() == programmer_twitter_id.strip('@').lower():
         process_command(mention.text, issuer_id=programmer_twitter_id, tweet_id=mention.id)
-    elif mention.user.screen_name.strip('@').lower().strip() == 'realdonaldtrump':
+    elif mention.user.screen_name.strip('@').lower().strip() == target_twitter_id:
         if debugging: print("Oh my! The Donald is speaking! Click your jackboots together and salute!")
-        modified_retweet('LOL\n\n', user_id="realDonaldTrump", tweet_id=mention.id)
+        modified_retweet('LOL\n\n', user_id=target_twitter_id, tweet_id=mention.id)
     else:
         if debugging:
             th.print_wrapped('WARNING: unhandled mention from user @%s' % mention.user.screen_name)
@@ -304,7 +299,7 @@ def handle_mention(mention):
 def check_mentions():
     """A stub to check for any @mentions and, if necessary, reply to them.
     """
-    for mention in [m for m in get_API().mentions_timeline(count=100) if m.id > get_newest_mention_id()]:
+    for mention in [m for m in the_API.mentions_timeline(count=100) if m.id > get_newest_mention_id()]:
         handle_mention(mention)
         set_data_value('last_mention_id', max(mention.id, get_newest_mention_id()))
 
