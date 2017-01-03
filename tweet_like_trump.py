@@ -44,7 +44,7 @@ def _get_data_store():
         with open(data_store, 'rb') as the_data_file:
             return pickle.load(the_data_file)
     except Exception:
-        if debugging: th.print_indented('WARNING: Data store does not exist, creating ...')
+        if debugging: th.print_wrapped('WARNING: Data store does not exist, creating ...')
         the_data = {'purpose': 'data store for TrumpTweets',
                     'program author': 'Patrick Mooney',
                     'script URL': 'https://github.com/patrick-brian-mooney/make-america-sad-again',
@@ -76,11 +76,11 @@ def get_data_value(keyname):
     try:
         return _get_data_store()[keyname]
     except KeyError:
-        if debugging: th.print_indented('WARNING: attempted to get undefined data key "%s"; initializing to None' % keyname)
+        if debugging: th.print_wrapped('WARNING: attempted to get undefined data key "%s"; initializing to None' % keyname)
         set_data_value(keyname, None)
         return None
 
-def _get_API():
+def _get_new_API():
     """Get an instance of the Tweepy API object to work with.
     """
     auth = tweepy.OAuthHandler(Trump_client['consumer_key'], Trump_client['consumer_secret'])
@@ -92,7 +92,7 @@ def get_API():
     """
     global the_API
     if not the_API:
-        the_API = _get_API()
+        the_API = _get_new_API()
     return the_API
 
 def get_new_tweets(screen_name='realDonaldTrump', oldest=-1):
@@ -174,10 +174,14 @@ def normalize(the_tweet):
                          ['  ', ' '],               # Two spaces to one space
                          ['U.S.A.', 'U․S․A․'],      # Periods to one-dot leaders
                          ['U. S. A.', 'U․S․A․'],    # Periods to one-dot leaders, remove spaces
-                         ['U.S.', 'U․S․'],          # Periods to one-dot leaders
                          ['U. S.', 'U․S․'],         # Periods to one-dot leaders, remove spaces
+                         ['U.S.', 'U․S․'],          # Periods to one-dot leaders
                          ['P․M․', 'P․M․'],          # Again
                          ['V.P.', 'V․P․'],          # Again
+                         ['Mr.', 'Mr․'],            # Again
+                         ['Dr.', 'Dr․'],            # Again
+                         ['Mrs.', 'Mrs․'],          # Again
+                         ['Rev.', 'Rev․'],          # Again
                         ]
     changed = True              # Be sure to run at least once.
     while changed:              # Repeatedly perform all substitutions until none of them change anything at all.
@@ -231,7 +235,7 @@ def get_tweet(starts, the_mapping):
         sents = random.choice(range(2,5))
         if debugging: print("Generating a tweet (%d sentences) ..." % sents, end="")
         the_tweet = sg.gen_text(the_mapping, starts, markov_length=markov_length, sentences_desired=sents)
-        if debugging: th.print_indented(" length is %d" % len(the_tweet))
+        if debugging: print("length is %d" % len(the_tweet))
     return the_tweet
 
 def tweet(text):
@@ -246,11 +250,11 @@ def post_reply(text, user_id, tweet_id):
     
     Currently does not actually post the tweet, but just prints to stdout. 
     """
-    if debugging: th.print_indented("INFO: posting tweet: @%s %s  ----  in reply to tweet ID# %d" % (user_id, text, tweet_id))    
+    if debugging: th.print_wrapped("INFO: posting tweet: @%s %s  ----  in reply to tweet ID# %d" % (user_id, text, tweet_id))    
     # get_API().update_status("@%s %s" % (user_id, text), in_reply_to_status_id = tweet_id)
 
 def modified_retweet(text, user_id, tweet_id):
-    if debugging: th.print_indented("%s\n\nhttps://twitter.com/%s/status/%s" % (text, user_id, tweet_ID))
+    if debugging: th.print_wrapped("%s\n\nhttps://twitter.com/%s/status/%s" % (text, user_id, tweet_ID))
     # get_API().update_status("%s\n\nhttps://twitter.com/%s/status/%s" % (text, user_id, tweet_ID))
 
 def process_command(command, issuer_id, tweet_id):
@@ -270,14 +274,18 @@ def handle_mention(mention):
     """Process the mention in whatever way is appropriate.
     """
     if debugging:
-        th.print_indented("INFO: Handling mention ID #%d" % mention.id)
-        th.print_indented("  text is: %s" % mention.text)
-        th.print_indented("  user is: @%s" % mention.user.screen_name)
+        th.print_wrapped("INFO: Handling mention ID #%d" % mention.id)
+        th.print_indented("text is: %s" % mention.text)
+        th.print_indented("user is: @%s" % mention.user.screen_name)
     if mention.user.screen_name.strip('@').lower() == programmer_twitter_id.strip('@').lower():
         process_command(mention.text, issuer_id=programmer_twitter_id, tweet_id=mention.id)
     elif mention.user.screen_name.strip('@').lower().strip() == 'realdonaldtrump':
-        if debugging: print("Oh my! The Donald is speaking")
+        if debugging: print("Oh my! The Donald is speaking! Click your jackboots together and salute!")
         modified_retweet('LOL\n\n', user_id="realDonaldTrump", tweet_id=mention.id)
+    else:
+        if debugging:
+            th.print_wrapped('WARNING: unhandled mention from user @%s' % mention.user.screen_name)
+            th.print_indented("the tweet is: %s" % mention.text)
 
 def check_mentions():
     """A stub to check for any @mentions and, if necessary, reply to them.
@@ -297,7 +305,7 @@ def set_up():
 
 if __name__ == '__main__':
     if get_data_value('stopped'):
-        if debugging: th.print_indented('Aborting: user data key "stopped" is set.')
+        if debugging: th.print_wrapped('Aborting: user data key "stopped" is set.')
         sys.exit(0)
     set_up()
     donnies_words = [][:]
