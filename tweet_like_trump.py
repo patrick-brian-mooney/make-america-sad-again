@@ -42,7 +42,7 @@ markov_length = 2
 
 programmer_twitter_id = 'patrick_mooney'    # That's me, the author of this script: @patrick_mooney
 target_twitter_id = 'realDonaldTrump'       # That's the person whose tweets we're monitoring and imitating: @realDonaldTrump
-my_twitter_id = 'herr_drumpf'               # That's the Twitter username under which the script posts: @herr_drumpf
+my_twitter_id = 'false_trump'               # That's the Twitter username under which the script posts: @herr_drumpf
 
 
 def _get_new_API():
@@ -304,20 +304,20 @@ def tweet(text):
 def process_command(command, issuer_id, tweet_id):
     """Process a command coming from my own twitter account.
     """
-    command_parts = [c.strip().lower() for c in command.strip().split()]
+    command_parts = [c.strip().lower() for c in command.strip().split() if not c.strip().startswith('@')]
     if command_parts[0] in ['stop', 'quiet', 'silence']:
         set_data_value('stopped', True)
-        sm.send_DM('You got it, sir, halting tweets per your command.', user=issuer_id)
+        sm.send_DM(the_API=the_API, text='You got it, sir, halting tweets per your command.', user=issuer_id)
         log_it('INFO: aborting run because command "%s" was issued.' % command_parts[0])
         sys.exit(0)
     elif command_parts[0] in ['start', 'verbose', 'go', 'loud', 'begin']:
         set_data_value('stopped', False)
-        sm.send_DM('Yessir, beginning tweeting again per your command.', user=issuer_id)
+        sm.send_DM(the_API=the_API, text='Yessir, beginning tweeting again per your command.', user=issuer_id)
     elif command_parts[0] in ['update', 'refresh', 'check', 'reload', 'new']:
         update_tweet_collection()
-        sm.send_DM('You got it, sir: tweet collection updated.', user=issuer_id)
+        sm.send_DM(the_API=the_API, text='You got it, sir: tweet collection updated.', user=issuer_id)
     else:
-        sm.send_DM("Sorry, sir. I didn't understand that.", user=issuer_id)
+        sm.send_DM(the_API=the_API, text="Sorry, sir. I didn't understand that.", user=issuer_id)
 
 def handle_mention(mention):
     """Process the mention in whatever way is appropriate.
@@ -348,15 +348,16 @@ def handle_dm(direct_message):
     respond usefully to DMs.
     """
     log_it("INFO: Handling direct message ID #%d" % direct_message.id)
+    log_it("direct message is:\n\n%s" % pprint.pformat(direct_message))
     log_it("text is: %s" % direct_message.text)
-    log_it("user is: @%s" % direct_message.user.screen_name)
-    if direct_message.user.screen_name.lower().strip('@') == programmer_twitter_id.lower().strip('@'):
+    log_it("user is: @%s" % direct_message.sender_screen_name)
+    if direct_message.sender_screen_name.lower().strip('@') == programmer_twitter_id.lower().strip('@'):
         process_command(direct_message.text, issuer_id=programmer_twitter_id, tweet_id=direct_message.id)
     else:
         log_it("WARNING: unhandled DM detected:")
         log_it(pprint.pformat(direct_message))
         log_it("Replying with default message")
-        sm.send_DM("Sorry, I'm a bot and don't understand how to deal with direct messages. If you need to reach my human minder, tweet at @patrick_mooney.", user=direct_message.user.screen_name) 
+        sm.send_DM(the_API=the_API, text="Sorry, I'm a bot and don't understand how to deal with direct messages. If you need to reach my human minder, tweet at @patrick_mooney.", user=direct_message.user.screen_name) 
 
 def check_DMs():
     """Check and handle any direct messages.
@@ -371,14 +372,14 @@ def set_up():
     """
     update_tweet_collection_if_necessary()
     check_mentions()
-#    check_DMs()
+    check_DMs()
 
 
 if __name__ == '__main__':
+    set_up()
     if get_data_value('stopped'):
         log_it('Aborting: user data key "stopped" is set.')
         sys.exit(0)
-    set_up()
     donnies_words = [][:]
     for the_file in glob.glob('%s/*txt' % donnies_tweets_dir):
         donnies_words += sg.word_list(the_file)
