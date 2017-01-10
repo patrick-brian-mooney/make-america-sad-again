@@ -28,8 +28,7 @@ import pickle
 import tweepy   # https://github.com/tweepy/tweepy
 
 # An unshared file that contains my authentication constants for various social media platforms.
-from social_media_auth import personalTwitter_client
-Trump_client = personalTwitter_client   # Change this when Twitter finally fixes the new-API-key problem
+from social_media_auth import Trump_client
 
 import sentence_generator as sg         # https://github.com/patrick-brian-mooney/markov-sentence-generator
 import text_handling as th              # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/text_handling.py
@@ -43,9 +42,9 @@ data_store = '%s/TrumpTweets_data.pkl' % base_dir
 
 markov_length = 2
 
-programmer_twitter_id = 'patrick_mooney'    # That's me, the author of this script
-target_twitter_id = 'realDonaldTrump'       # That's the person whose tweets we're monitoring and imitating.
-my_twitter_id = 'herr_drumpf'               # That's the Twitter username under which the script posts.
+programmer_twitter_id = 'patrick_mooney'    # That's me, the author of this script: @patrick_mooney
+target_twitter_id = 'realDonaldTrump'       # That's the person whose tweets we're monitoring and imitating: @realDonaldTrump
+my_twitter_id = 'herr_drumpf'               # That's the Twitter username under which the script posts: @herr_drumpf
 
 
 def _get_new_API():
@@ -194,13 +193,7 @@ def normalize(the_tweet):
                          ['Ms.', 'Ms․'],            # Again
                          ['Rev.', 'Rev․'],          # Again
                         ]
-    changed = True              # Be sure to run at least once.
-    while changed:              # Repeatedly perform all substitutions until none of them change anything at all.
-        orig_tweet = the_tweet.text[:]
-        for which_replacement in substitution_list:
-            the_tweet.text = the_tweet.text.replace(which_replacement[0], which_replacement[1])
-        changed = ( orig_tweet != the_tweet.text )
-    the_tweet.text = html.unescape(the_tweet.text)
+    the_tweet.text = html.unescape(th.replace(the_tweet.text, substitution_list))
     return the_tweet
 
 def massage_tweets(the_tweets):
