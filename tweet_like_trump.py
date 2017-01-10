@@ -17,28 +17,26 @@ file LICENSE.md for details.
 """
 
 
-import datetime
-import sys
-import pprint
-import glob
-import random
-import html
-import pickle
+import datetime, sys, pprint, glob, random, html, pickle
 
-import tweepy   # https://github.com/tweepy/tweepy
+import tweepy                               # https://github.com/tweepy/tweepy
 
-# An unshared file that contains my authentication constants for various social media platforms.
 from social_media_auth import Trump_client
+        # That's an unshared file that contains my authentication constants for various social media platforms.
 
-import sentence_generator as sg         # https://github.com/patrick-brian-mooney/markov-sentence-generator
-import text_handling as th              # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/text_handling.py
+import social_media as sm                   # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/social_media.py
+import sentence_generator as sg             # https://github.com/patrick-brian-mooney/markov-sentence-generator
+import text_handling as th                  # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/text_handling.py
+import patrick_logger                       # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/patrick_logger.py
+from patrick_logger import log_it
 
+patrick_logger.verbosity_level = 1          # As of 9 January 2017, 1 is the highest meaningful level for this script
+force_download = False                      # Set to True to always check for new tweets from Trump .
 
-debugging = True
-force_download = False                  # Set to True to always update tweets .
-
-base_dir = '/TrumpTweets'
-data_store = '%s/TrumpTweets_data.pkl' % base_dir
+base_dir            = '/TrumpTweets'
+data_store          = '%s/TrumpTweets_data.pkl' % base_dir
+tweets_store        = "%s/tweets.txt" % base_dir
+donnies_tweets_dir  = "%s/tweets" % base_dir
 
 markov_length = 2
 
@@ -59,13 +57,14 @@ the_API = _get_new_API()
 
 def _get_data_store():
     """Internal function to get the entire stored data dictionary. If the data
-    storage dictionary cannot be read, create a new, empty dictionary.
+    storage dictionary cannot be read, create a new dictionary with default
+    values.
     """
     try:
         with open(data_store, 'rb') as the_data_file:
             return pickle.load(the_data_file)
     except Exception:
-        if debugging: th.print_wrapped('WARNING: Data store does not exist or cannot be read, creating ...')
+        log_it('WARNING: Data store does not exist or cannot be read, creating ...')
         the_data = {'purpose': 'data store for the TrumpTweets project at @MakeAmericaSad!Again',
                     'program author': 'Patrick Mooney',
                     'script URL': 'https://github.com/patrick-brian-mooney/make-america-sad-again',
@@ -89,15 +88,15 @@ def set_data_value(keyname, value):
         pickle.dump(the_data, the_data_file)
 
 def get_data_value(keyname):
-    """Retrieves a configuration variable from the data_store file. Not meant to be
-    easily user-editable. If the KEYNAME is not in the data store, adds a KEYNAME
-    entry with value None and returns None. If it modifies the data store in this
-    way, it then writes the data store back to disk.
+    """Retrieves a configuration variable from the data_store file, which is not
+    meant to be easily user-editable. If the KEYNAME is not in the data store,
+    adds a KEYNAME entry with value None and returns None. If it modifies the data
+    store in this way, it then writes the data store back to disk.
     """
     try:
         return _get_data_store()[keyname]
     except KeyError:
-        if debugging: th.print_wrapped('WARNING: attempted to get undefined data key "%s"; initializing to None' % keyname)
+        log_it('WARNING: attempted to get undefined data key "%s"; initializing to None' % keyname)
         set_data_value(keyname, None)
         return None
 
@@ -113,11 +112,11 @@ def get_new_tweets(screen_name=target_twitter_id, oldest=-1):
 
     # keep grabbing tweets until there are no tweets left
     while len(new_tweets) > 0 and oldest < new_tweets[0].id:
-        if debugging: print("getting all tweets before ID #%s" % (oldest_tweet), end='')
+        log_it("getting all tweets before ID #%s" % (oldest_tweet))
         new_tweets = the_API.user_timeline(screen_name = screen_name, count=200, max_id=oldest_tweet)
         ret.extend(new_tweets)
         oldest_tweet = ret[-1].id - 1
-        if debugging: print("    ...%s tweets downloaded so far" % (len(ret)))
+        log_it("    ...%s tweets downloaded so far" % (len(ret)))
     set_data_value('newest_tweet_id', max([t.id for t in ret]))
     return [t for t in ret if (t.id > oldest)]
 
@@ -193,7 +192,7 @@ def normalize(the_tweet):
                          ['Ms.', 'Ms․'],            # Again
                          ['Rev.', 'Rev․'],          # Again
                         ]
-    the_tweet.text = html.unescape(th.replace(the_tweet.text, substitution_list))
+    the_tweet.text = html.unescape(th.multi_replace(the_tweet.text, substitution_list))
     return the_tweet
 
 def massage_tweets(the_tweets):
@@ -210,7 +209,7 @@ def save_tweets(the_tweets):
     """
     if len(the_tweets) == 0:        # If there are no new tweets, don't do anything
         return
-    with open('%s/tweets/%s.txt' % (base_dir, datetime.datetime.now().isoformat()), 'w') as f:
+    with open('%s/tweets/%s.txt' % (donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w') as f:
         f.writelines(['%s\n' % tweet.text for tweet in the_tweets])
     set_data_value('last_update_date', datetime.datetime.now())     # then, update the database of tweet-record filenames and ID numbers
 
@@ -218,11 +217,11 @@ def _num_tweet_files():
     """Convenience function to return the number of files in which The Donald's
     tweets are stored.
     """
-    return len(glob.glob('%s/tweets/*txt' % base_dir))
+    return len(glob.glob('%s/*txt' % donnies_tweets_dir))
 
 def update_tweet_collection():
     """Update the tweet collection."""
-    if debugging: print("INFO: updating tweet collection")
+    log_it("INFO: updating tweet collection")
     t = get_new_tweets(screen_name=target_twitter_id, oldest=get_newest_tweet_id())
     t = massage_tweets(t)
     save_tweets(t)
@@ -234,45 +233,73 @@ def update_tweet_collection_if_necessary():
     if _num_tweet_files == 0 or (datetime.datetime.now() - get_last_update_date()).days > 30 or random.random() < 0.03 or force_download:
         update_tweet_collection()
 
+def did_donnie_say_it(what):
+    """Return True if WHAT has appeared in the Trump tweets we know about, or
+    False otherwise.
+    """
+    ret = False
+    donnies_wisdom_files = glob.glob('%s/*txt' % donnies_tweets_dir)
+    while not ret and len(donnies_wisdom_files) != 0:   # Check files one by one until we find that donnie said it, or run out of files.
+        which_file = donnies_wisdom_files.pop()
+        with open(which_file) as the_file:
+            ret = what.strip().lower() in [ the_line.strip().lower() for the_line in the_file.readlines() ]
+    return ret
+
+def did_we_say_it(what):
+    """Return True if we've previously tweeted WHAT, or False otherwise.
+    """
+    try:
+        with open(tweets_store) as the_file:
+            return what.strip().lower() in [ line.strip().lower() for line in the_file.readlines ] 
+    except Exception:
+        return False
+
+def validate_tweet(the_tweet):
+    """Return True if the tweet is acceptable according to whatever criteria this
+    particular function decides, or False if the tweet is not acceptable.
+    
+    Currently, the function approves all tweets, unless they meet any of the 
+    following criteria:
+        
+        * length is not in range(20,141)
+        * is exactly the same as another tweet by The Donald.
+        * is identical to a previous tweet by this account
+    """
+    if not len(the_tweet) in range(20,141):
+        return False
+    if did_donnie_say_it(the_tweet):
+        return False
+    if did_we_say_it(the_tweet):
+        return False
+    return True
+
 def get_tweet(starts, the_mapping):
     """Produces a tweet by repeatedly calling the text generator with varying
     parameters until it coughs up something in the right length range.
     """
-    the_tweet = ' ' * 160
-    while len(the_tweet) not in range(20,141):
+    got_tweet = False
+    while not got_tweet:
         sents = random.choice(range(2,5))
-        if debugging: print("Generating a tweet (%d sentences) ..." % sents, end="")
+        log_it("Generating a tweet (%d sentences) ..." % sents)
         the_tweet = sg.gen_text(the_mapping, starts, markov_length=markov_length, sentences_desired=sents)
-        if debugging: print("length is %d" % len(the_tweet))
+        got_tweet = validate_tweet(the_tweet)
+        log_it("length is %d" % len(the_tweet))
     return the_tweet
 
 def tweet(text):
-    """Post a tweet. Currently, it doesn't actually do so; it just prints it to stdout.
+    """Post a tweet. Also, add the tweet to the list of tweets created so far by
+    the script.
     """
-    th.print_indented(text)
-
-def post_reply(text, user_id, tweet_id):
-    """Post a reply tweet. TWEET_ID is the id of the tweet that this tweet is a reply
-    to; the USER_ID is the person to whom we are replying, and the user_id is
-    automatically prepended to the beginning of TEXT before posting.
-
-    Currently does not actually post the tweet, but just prints to stdout.
-    """
-    if debugging: th.print_wrapped("INFO: posting tweet: @%s %s  ----  in reply to tweet ID# %d" % (user_id, text, tweet_id))
-    # the_API.update_status("@%s %s" % (user_id, text), in_reply_to_status_id = tweet_id)
-
-def modified_retweet(text, user_id, tweet_id):
-    """Tweet a message about another status update.
-    """
-    if debugging: th.print_wrapped("%s\n\nhttps://twitter.com/%s/status/%s" % (text, user_id, tweet_ID))
-    # the_API.update_status("%s\n\nhttps://twitter.com/%s/status/%s" % (text, user_id, tweet_ID))
-
-def send_DM(text, user):
-    """Send a direct message to another user. Currently, this method is only used to
-    reply to DMs sent by other users. Does not currently do anything.
-    """
-    if debugging: th.print_wrapped("DM @%s: %s" % (user, text))
-    # the_API.send_direct_message(user, text)
+    log_it("Tweet is: %s" % text)
+    sm.post_tweet(Trump_client, text)
+    try:
+        with open(tweets_store) as the_file:
+            the_lines = the_file.readlines()
+    except Exception:
+        the_lines = [][:]
+    the_lines += [ text + '\n' ]
+    with open(tweets_store, 'w') as the_file:
+        the_file.writelines(the_lines) 
 
 def process_command(command, issuer_id, tweet_id):
     """Process a command coming from my own twitter account.
@@ -280,34 +307,33 @@ def process_command(command, issuer_id, tweet_id):
     command_parts = [c.strip().lower() for c in command.strip().split()]
     if command_parts[0] in ['stop', 'quiet', 'silence']:
         set_data_value('stopped', True)
-        send_DM('You got it, sir, halting tweets per your command.', user=issuer_id)
-        if debugging: th.print_wrapped('INFO: aborting run because command "%s" was issued.' % command_parts[0])
+        sm.send_DM('You got it, sir, halting tweets per your command.', user=issuer_id)
+        log_it('INFO: aborting run because command "%s" was issued.' % command_parts[0])
         sys.exit(0)
     elif command_parts[0] in ['start', 'verbose', 'go', 'loud', 'begin']:
         set_data_value('stopped', False)
-        send_DM('Yessir, beginning tweeting again per your command.', user=issuer_id)
+        sm.send_DM('Yessir, beginning tweeting again per your command.', user=issuer_id)
     elif command_parts[0] in ['update', 'refresh', 'check', 'reload', 'new']:
         update_tweet_collection()
-        send_DM('You got it, sir: tweet collection updated.', user=issuer_id)
+        sm.send_DM('You got it, sir: tweet collection updated.', user=issuer_id)
     else:
-        send_DM("Sorry, sir. I didn't understand that.", user=issuer_id)
+        sm.send_DM("Sorry, sir. I didn't understand that.", user=issuer_id)
 
 def handle_mention(mention):
     """Process the mention in whatever way is appropriate.
     """
-    if debugging:
-        th.print_wrapped("INFO: Handling mention ID #%d" % mention.id)
-        th.print_indented("text is: %s" % mention.text)
-        th.print_indented("user is: @%s" % mention.user.screen_name)
+    log_it("INFO: Handling mention ID #%d" % mention.id)
+    log_it("text is: %s" % mention.text)
+    log_it("user is: @%s" % mention.user.screen_name)
     if mention.user.screen_name.strip('@').lower() == programmer_twitter_id.strip('@').lower():
         process_command(mention.text, issuer_id=programmer_twitter_id, tweet_id=mention.id)
     elif mention.user.screen_name.strip('@').lower().strip() == target_twitter_id:
-        if debugging: print("Oh my! The Donald is speaking! Click your jackboots together and salute!")
-        modified_retweet('LOL\n\n', user_id=target_twitter_id, tweet_id=mention.id)
+        log_it("Oh my! The Donald is speaking! Click your jackboots together and salute!")
+        sm.modified_retweet('LOL\n\n', user_id=target_twitter_id, tweet_id=mention.id)
+        sm.modified_retweet('LOL\n\n', user_id=target_twitter_id, tweet_id=mention.id)
     else:
-        if debugging:
-            th.print_wrapped('WARNING: unhandled mention from user @%s' % mention.user.screen_name)
-            th.print_indented("the tweet is: %s" % mention.text)
+        log_it('WARNING: unhandled mention from user @%s' % mention.user.screen_name)
+        log_it("the tweet is: %s" % mention.text)
 
 def check_mentions():
     """A stub to check for any @mentions and, if necessary, reply to them.
@@ -321,18 +347,16 @@ def handle_dm(direct_message):
     command, and replies to anyone else with an explanation that it doesn't
     respond usefully to DMs.
     """
-    if debugging:
-        th.print_wrapped("INFO: Handling direct message ID #%d" % direct_message.id)
-        th.print_indented("text is: %s" % direct_message.text)
-        th.print_indented("user is: @%s" % direct_message.user.screen_name)
+    log_it("INFO: Handling direct message ID #%d" % direct_message.id)
+    log_it("text is: %s" % direct_message.text)
+    log_it("user is: @%s" % direct_message.user.screen_name)
     if direct_message.user.screen_name.lower().strip('@') == programmer_twitter_id.lower().strip('@'):
         process_command(direct_message.text, issuer_id=programmer_twitter_id, tweet_id=direct_message.id)
     else:
-        if debugging:
-            th.print_wrapped("WARNING: unhandled DM detected:")
-            pprint.pprint(direct_message)
-            th.print_wrapped("Replying with default message")
-        send_DM("Sorry, I'm a bot and don't understand how to deal with direct messages. If you need to reach my human minder, tweet at @patrick_mooney.", user=direct_message.user.screen_name) 
+        log_it("WARNING: unhandled DM detected:")
+        log_it(pprint.pformat(direct_message))
+        log_it("Replying with default message")
+        sm.send_DM("Sorry, I'm a bot and don't understand how to deal with direct messages. If you need to reach my human minder, tweet at @patrick_mooney.", user=direct_message.user.screen_name) 
 
 def check_DMs():
     """Check and handle any direct messages.
@@ -352,11 +376,11 @@ def set_up():
 
 if __name__ == '__main__':
     if get_data_value('stopped'):
-        if debugging: th.print_wrapped('Aborting: user data key "stopped" is set.')
+        log_it('Aborting: user data key "stopped" is set.')
         sys.exit(0)
     set_up()
     donnies_words = [][:]
-    for the_file in glob.glob('%s/tweets/*txt' % base_dir):
+    for the_file in glob.glob('%s/*txt' % donnies_tweets_dir):
         donnies_words += sg.word_list(the_file)
     starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
     tweet(get_tweet(starts, the_mapping))
