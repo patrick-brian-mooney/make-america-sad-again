@@ -32,6 +32,7 @@ from patrick_logger import log_it
 
 patrick_logger.verbosity_level = 1          # As of 9 January 2017, 1 is the highest meaningful level for this script
 force_download = False                      # Set to True to always check for new tweets from Trump .
+force_tweet = True                          # Skip the dice roll & go ahead and post.
 
 base_dir            = '/TrumpTweets'
 data_store          = '%s/TrumpTweets_data.pkl' % base_dir
@@ -179,7 +180,7 @@ def normalize(the_tweet):
     """
     substitution_list = [['\n', ' '],               # Newline to space
                          ['  ', ' '],               # Two spaces to one space
-                         ['U.S.A.', 'U․S․A․'],      # Periods to one-dot leaders
+                         ['U.S.A.', 'U․S․A․'],       # Periods to one-dot leaders
                          ['U. S. A.', 'U․S․A․'],    # Periods to one-dot leaders, remove spaces
                          ['U. S.', 'U․S․'],         # Periods to one-dot leaders, remove spaces
                          ['U.S.', 'U․S․'],          # Periods to one-dot leaders
@@ -209,7 +210,7 @@ def save_tweets(the_tweets):
     """
     if len(the_tweets) == 0:        # If there are no new tweets, don't do anything
         return
-    with open('%s/tweets/%s.txt' % (donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w') as f:
+    with open('%s/%s.txt' % (donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w') as f:
         f.writelines(['%s\n' % tweet.text for tweet in the_tweets])
     set_data_value('last_update_date', datetime.datetime.now())     # then, update the database of tweet-record filenames and ID numbers
 
@@ -230,7 +231,7 @@ def update_tweet_collection_if_necessary():
     """Once in a while, import new tweets encoding the brilliance that The Donald &
     his team have graced the world by sharing.
     """
-    if _num_tweet_files == 0 or (datetime.datetime.now() - get_last_update_date()).days > 30 or random.random() < 0.03 or force_download:
+    if _num_tweet_files == 0 or (datetime.datetime.now() - get_last_update_date()).days > 30 or random.random() < 0.003 or force_download:
         update_tweet_collection()
 
 def did_donnie_say_it(what):
@@ -250,27 +251,32 @@ def did_we_say_it(what):
     """
     try:
         with open(tweets_store) as the_file:
-            return what.strip().lower() in [ line.strip().lower() for line in the_file.readlines ] 
+            return what.strip().lower() in [ line.strip().lower() for line in the_file.readlines ]
     except Exception:
         return False
 
 def validate_tweet(the_tweet):
     """Return True if the tweet is acceptable according to whatever criteria this
     particular function decides, or False if the tweet is not acceptable.
-    
-    Currently, the function approves all tweets, unless they meet any of the 
+
+    Currently, the function approves all tweets, unless they meet any of the
     following criteria:
-        
+
         * length is not in range(20,141)
         * is exactly the same as another tweet by The Donald.
         * is identical to a previous tweet by this account
     """
+    log_it("INFO: function validate_tweet() called", 2)
     if not len(the_tweet) in range(20,141):
+        log_it('INFO; rejecting tweet "%s" because its length is %d' % (the_tweet, len(the_tweet)), 2)
         return False
     if did_donnie_say_it(the_tweet):
+        log_it('INFO: rejecting tweet "%s" because The Donald has said exactly that.' % the_tweet, 2)
         return False
     if did_we_say_it(the_tweet):
+        log_it('INFO: rejecting tweet "%s" because we\'ve previously said precisely that.' % the_tweet, 2)
         return False
+    log_it('INFO: approving tweet "%s".' % the_tweet, 2)
     return True
 
 def get_tweet(starts, the_mapping):
@@ -279,7 +285,7 @@ def get_tweet(starts, the_mapping):
     """
     got_tweet = False
     while not got_tweet:
-        sents = random.choice(range(2,5))
+        sents = random.choice(range(1,5))
         log_it("Generating a tweet (%d sentences) ..." % sents)
         the_tweet = sg.gen_text(the_mapping, starts, markov_length=markov_length, sentences_desired=sents)
         got_tweet = validate_tweet(the_tweet)
@@ -299,7 +305,7 @@ def tweet(text):
         the_lines = [][:]
     the_lines += [ text + '\n' ]
     with open(tweets_store, 'w') as the_file:
-        the_file.writelines(the_lines) 
+        the_file.writelines(the_lines)
 
 def process_command(command, issuer_id, tweet_id):
     """Process a command coming from my own twitter account.
@@ -348,7 +354,7 @@ def handle_dm(direct_message):
     respond usefully to DMs.
     """
     log_it("INFO: Handling direct message ID #%d" % direct_message.id)
-    log_it("direct message is:\n\n%s" % pprint.pformat(direct_message))
+    log_it("direct message is:\n\n%s" % pprint.pformat(direct_message), 3)
     log_it("text is: %s" % direct_message.text)
     log_it("user is: @%s" % direct_message.sender_screen_name)
     if direct_message.sender_screen_name.lower().strip('@') == programmer_twitter_id.lower().strip('@'):
@@ -357,13 +363,14 @@ def handle_dm(direct_message):
         log_it("WARNING: unhandled DM detected:")
         log_it(pprint.pformat(direct_message))
         log_it("Replying with default message")
-        sm.send_DM(the_API=the_API, text="Sorry, I'm a bot and don't understand how to deal with direct messages. If you need to reach my human minder, tweet at @patrick_mooney.", user=direct_message.user.screen_name) 
+        sm.send_DM(the_API=the_API, text="Sorry, I'm a bot and don't process direct messages. If you need to reach my human minder, he's @patrick_mooney.", user=direct_message.sender_screen_name)
+    set_data_value('last_dm_id', max(direct_message.id, get_newest_dm_id()))
 
 def check_DMs():
     """Check and handle any direct messages.
     """
     for dm in [dm for dm in the_API.direct_messages(count=100, full_text=True, since_id=get_newest_dm_id()) if dm.id > get_newest_dm_id()]:
-        handle_dm(dm) 
+        handle_dm(dm)
 
 def set_up():
     """Perform pre-tweeting tasks. Currently (as of 1 Jan 2017), it just updates the
@@ -381,7 +388,14 @@ if __name__ == '__main__':
         log_it('Aborting: user data key "stopped" is set.')
         sys.exit(0)
     donnies_words = [][:]
-    for the_file in glob.glob('%s/*txt' % donnies_tweets_dir):
+    for the_file in glob.glob('%s*txt' % donnies_tweets_dir):
         donnies_words += sg.word_list(the_file)
-    starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
-    tweet(get_tweet(starts, the_mapping))
+
+    # @realDonaldTrump tweeted 200 times between 12/04/16 03:48 AM & 01/10/17 12:51 PM; that's approx. 5.3 tweets/day.
+    # If this script is called every fifteen minutes by a cron job, that's 96 times/day
+    # That works out to needing to tweet on 5.57382532% of the script's invocations.
+    if force_tweet or random.random() <= 0.0557382532:
+        starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
+        tweet(get_tweet(starts, the_mapping))
+    else:
+        log_it('INFO: not tweeting because dice roll failed')
