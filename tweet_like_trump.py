@@ -31,19 +31,19 @@ import patrick_logger                       # https://github.com/patrick-brian-m
 from patrick_logger import log_it
 
 patrick_logger.verbosity_level = 1          # As of 9 January 2017, 1 is the highest meaningful level for this script
-force_download = False                      # Set to True to always check for new tweets from Trump .
-force_tweet = True                          # Skip the dice roll & go ahead and post.
+force_download          = False             # Set to True to always check for new tweets from Trump .
+force_tweet             = True              # Skip the dice roll & go ahead and post.
 
-base_dir            = '/TrumpTweets'
-data_store          = '%s/TrumpTweets_data.pkl' % base_dir
-tweets_store        = "%s/tweets.txt" % base_dir
-donnies_tweets_dir  = "%s/tweets" % base_dir
+base_dir                = '/TrumpTweets'
+data_store              = '%s/TrumpTweets_data.pkl' % base_dir
+tweets_store            = "%s/tweets.txt" % base_dir
+donnies_tweets_dir      = "%s/tweets" % base_dir
 
 markov_length = 2
 
-programmer_twitter_id = 'patrick_mooney'    # That's me, the author of this script: @patrick_mooney
-target_twitter_id = 'realDonaldTrump'       # That's the person whose tweets we're monitoring and imitating: @realDonaldTrump
-my_twitter_id = 'false_trump'               # That's the Twitter username under which the script posts: @herr_drumpf
+programmer_twitter_id   = 'patrick_mooney'    # That's me, the author of this script: @patrick_mooney
+target_twitter_id       = 'realDonaldTrump'   # That's the person whose tweets we're monitoring and imitating: @realDonaldTrump
+my_twitter_id           = 'false_trump'       # That's the Twitter username under which the script posts: @herr_drumpf
 
 
 def _get_new_API():
@@ -238,20 +238,23 @@ def did_donnie_say_it(what):
     """Return True if WHAT has appeared in the Trump tweets we know about, or
     False otherwise.
     """
-    ret = False
-    donnies_wisdom_files = glob.glob('%s/*txt' % donnies_tweets_dir)
-    while not ret and len(donnies_wisdom_files) != 0:   # Check files one by one until we find that donnie said it, or run out of files.
-        which_file = donnies_wisdom_files.pop()
-        with open(which_file) as the_file:
-            ret = what.strip().lower() in [ the_line.strip().lower() for the_line in the_file.readlines() ]
-    return ret
+    try:
+        ret = False
+        donnies_wisdom_files = glob.glob('%s/*txt' % donnies_tweets_dir)
+        while not ret and len(donnies_wisdom_files) != 0:   # Check files one by one until we find that donnie said it, or run out of files.
+            which_file = donnies_wisdom_files.pop()
+            with open(which_file) as the_file:
+                ret = what.strip().lower() in ' '.join([ the_line.strip().lower() for the_line in the_file.readlines() ])
+        return ret
+    except Exception:
+        return False
 
 def did_we_say_it(what):
     """Return True if we've previously tweeted WHAT, or False otherwise.
     """
     try:
         with open(tweets_store) as the_file:
-            return what.strip().lower() in [ line.strip().lower() for line in the_file.readlines ]
+            return what.strip().lower() in ' '.join([ line.strip().lower() for line in the_file.readlines ])
     except Exception:
         return False
 
@@ -263,7 +266,7 @@ def validate_tweet(the_tweet):
     following criteria:
 
         * length is not in range(20,141)
-        * is exactly the same as another tweet by The Donald.
+        * is exactly the same as a tweet by The Donald.
         * is identical to a previous tweet by this account
     """
     log_it("INFO: function validate_tweet() called", 2)
@@ -387,14 +390,14 @@ if __name__ == '__main__':
     if get_data_value('stopped'):
         log_it('Aborting: user data key "stopped" is set.')
         sys.exit(0)
-    donnies_words = [][:]
-    for the_file in glob.glob('%s*txt' % donnies_tweets_dir):
-        donnies_words += sg.word_list(the_file)
 
     # @realDonaldTrump tweeted 200 times between 12/04/16 03:48 AM & 01/10/17 12:51 PM; that's approx. 5.3 tweets/day.
     # If this script is called every fifteen minutes by a cron job, that's 96 times/day
     # That works out to needing to tweet on 5.57382532% of the script's invocations.
     if force_tweet or random.random() <= 0.0557382532:
+        donnies_words = [][:]
+        for the_file in glob.glob('%s/*txt' % donnies_tweets_dir):
+            donnies_words += sg.word_list(the_file)
         starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
         tweet(get_tweet(starts, the_mapping))
     else:
