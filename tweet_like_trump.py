@@ -17,6 +17,7 @@ file LICENSE.md for details.
 """
 
 
+
 import datetime, sys, pprint, glob, random, html, pickle
 
 import tweepy                               # https://github.com/tweepy/tweepy
@@ -30,14 +31,19 @@ import text_handling as th                  # https://github.com/patrick-brian-m
 import patrick_logger                       # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/patrick_logger.py
 from patrick_logger import log_it
 
-patrick_logger.verbosity_level = 1          # As of 9 January 2017, 1 is the highest meaningful level for this script
+
+
+patrick_logger.verbosity_level = 2          # As of 14 January 2017, 3 is the highest meaningful level for this script
 force_download          = False             # Set to True to always check for new tweets from Trump .
-force_tweet             = True              # Skip the dice roll & go ahead and post.
+force_tweet             = True              # Skip the dice roll; definitely post a new tweet every time the script is run.
 
 base_dir                = '/TrumpTweets'
-data_store              = '%s/TrumpTweets_data.pkl' % base_dir
-tweets_store            = "%s/tweets.txt" % base_dir
-donnies_tweets_dir      = "%s/tweets" % base_dir
+data_dir                = '%s/data' % base_dir
+data_store              = '%s/TrumpTweets_data.pkl' % data_dir
+tweets_store            = "%s/our_tweets.txt" % data_dir
+DMs_store               = '%s/seen_DMs.pkl' % data_dir
+mentions_store          = '%s/seen_mentions.pkl' % data_dir
+donnies_tweets_dir      = "%s/donnies_tweets" % data_dir
 
 markov_length = 2
 
@@ -46,18 +52,31 @@ target_twitter_id       = 'realDonaldTrump'   # That's the person whose tweets w
 my_twitter_id           = 'false_trump'       # That's the Twitter username under which the script posts: @herr_drumpf
 
 
+
 def _get_new_API():
-    """Get an instance of the Tweepy API object to work with.
-    """
+    """Get an instance of the Tweepy API object to work with."""
     auth = tweepy.OAuthHandler(Trump_client['consumer_key'], Trump_client['consumer_secret'])
     auth.set_access_token(Trump_client['access_token'], Trump_client['access_token_secret'])
-    return tweepy.API(auth)
+    ret = tweepy.API(auth)
+    ret.wait_on_rate_limit, ret.wait_on_rate_limit_notify = True, True
+    return ret
 
 the_API = _get_new_API()
 
 
+# Miscellaneous convenience functions
+def _num_tweet_files():
+    """Convenience function to return the number of files in which The Donald's
+    tweets are stored.
+    """
+    return len(glob.glob('%s/*txt' % donnies_tweets_dir))
+
+
+# This next group of functions handles storing and retrieving basic program operation parameters (persistent globals).
+# This is actually an inefficient way to do this, but it'll work for the simple tasks this script needs.
+# Note that lists of already-processed DMs and @mentions are stored using a similar but separate mechanism.
 def _get_data_store():
-    """Internal function to get the entire stored data dictionary. If the data
+    """Private function to get the entire stored data dictionary. If the data
     storage dictionary cannot be read, create a new dictionary with default
     values.
     """
@@ -66,7 +85,7 @@ def _get_data_store():
             return pickle.load(the_data_file)
     except Exception:
         log_it('WARNING: Data store does not exist or cannot be read, creating ...')
-        the_data = {'purpose': 'data store for the TrumpTweets project at @MakeAmericaSad!Again',
+        the_data = {'purpose': 'data store for the TrumpTweets project at @false_trump',
                     'program author': 'Patrick Mooney',
                     'script URL': 'https://github.com/patrick-brian-mooney/make-america-sad-again',
                     'author twitter ID': '@patrick_mooney',
@@ -101,40 +120,28 @@ def get_data_value(keyname):
         set_data_value(keyname, None)
         return None
 
-def get_new_tweets(screen_name=target_twitter_id, oldest=-1):
-    """Get those tweets newer than the tweet whose ID is specified as the OLDEST
-    parameter from the account SCREEN_NAME.
-    """
-    # get most recent tweets (200 is maximum possible at once)
-    new_tweets = the_API.user_timeline(screen_name=screen_name, count=200)
-    ret = new_tweets.copy()
-
-    oldest_tweet = ret[-1].id - 1   # save the id of the tweet before the oldest tweet
-
-    # keep grabbing tweets until there are no tweets left
-    while len(new_tweets) > 0 and oldest < new_tweets[0].id:
-        log_it("getting all tweets before ID #%s" % (oldest_tweet))
-        new_tweets = the_API.user_timeline(screen_name = screen_name, count=200, max_id=oldest_tweet)
-        ret.extend(new_tweets)
-        oldest_tweet = ret[-1].id - 1
-        log_it("    ...%s tweets downloaded so far" % (len(ret)))
-    set_data_value('newest_tweet_id', max([t.id for t in ret]))
-    return [t for t in ret if (t.id > oldest)]
-
 def get_key_value_with_default(key_name, default=None):
+    """Try to get a key value from the data store. If that fails, return the
+    default value, instead, and create that key in the data store with the
+    specified default value.
+    """
     try:
-        return get_data_value(key_name) or default
-    except Exception:
+        ret = get_data_value(key_name)
+        if ret == None and default is not None:             # If necessary, set the default value.
+            set_data_value(key_name, default)
+            ret = default
+        return ret
+    except Exception as err:
+        log_it('WARNING: get_key_value_with_default() encountered exception "%s"; returning default value "%s"' % (err, default), 1)
         return default
 
+# This next group is a set of convenience functions that returns specific keys from the data store.
 def get_newest_tweet_id():
-    """Get the ID of the newest tweet that has been received and massaged.
-    """
+    """Get the ID of the newest tweet that has been received and massaged."""
     return get_key_value_with_default('newest_tweet_id', default=-1)
 
 def get_last_update_date():
-    """Get the last time that the database was updated.
-    """
+    """Get the last time that the database was updated."""
     return get_key_value_with_default('last_update_date', default=datetime.datetime.min)
 
 def get_newest_mention_id():
@@ -144,96 +151,106 @@ def get_newest_mention_id():
     return get_key_value_with_default('last_mention_id', default=-1)
 
 def get_newest_dm_id():
-    """Returns the ID of the most recently seen DM.
-    """
+    """Returns the ID of the most recently seen DM."""
     return get_key_value_with_default('last_dm_id', default=-1)
 
-def filter_tweet(tweet_text):
-    """Returns True if the tweet should be filtered (i.e., eliminated), False if it
-    should not be filtered (i.e., should remain in the list).
 
-    Currently, just eliminates tweets with URLs and tweets that @mention any
-    account other than @realDonaldTrump (i.e., when The Donald talks about, or to,
-    anyone else -- we don't want this account interacting with people just because
-    The Donald does. The Donald is a terrible model for appropriate behavior).
-
-    However, there may need to be more nuanced behavior in the future.
+# This next group of functions handles remembering DMs and @mentions that have been seen (and dealt with) previously.
+def _get_id_set(which_store):
+    """Unpickles and returns a set of ID numbers stored in the file WHICH_STORE.
+    Errors in this routine should be caught by the calling function.
     """
-    if 't.co' in tweet_text:    # All URLs coming from Twitter contain Twitter's redirection domain.
-        return True             # At this time, the text generator doesn't deal well with input text containing URLs.
-    elif '@' in tweet_text:     # Since more than one @mention can occur in a tweet ...
-        at_mentions = list(set([w for w in tweet_text.split() if '@' in w]))   # Make a list of all unique @mentions
-        if len(at_mentions) == 1:
-            return not (th.strip_leading_and_trailing_punctuation(at_mentions[0].strip()).strip().lower() == target_twitter_id.strip().lower())
-        else:                   # Filter out tweets mentioning more than one person:
-            return True         # by def'n, they're not just The Donald being self-aggrandizing.
-    return False
+    with open(which_store, 'rb') as msg_file:
+        return pickle.load(msg_file)
 
-def normalize(the_tweet):
-    """Convert THE_TWEET into a normalized form, based on the replacements in
-    SUBSTITUTION_LIST (specified below). All substitutions are applied repeatedly,
-    in the order they appear in the list, until none of them produces a change.
-    HTML/XML entities are also unescaped, and any necessary other transformations
-    are applied.
+def _store_id_set(which_store, the_set):
+    """Stuff the set of seen-message IDs back into the file WHICH_STORE."""
+    with open(which_store, 'wb') as msg_file:
+        pickle.dump(the_set, msg_file)
 
-    THE_TWEET is a Tweepy tweet object, not a string.
+def remember_id(which_store, id_num):
+    """Add ID_NUM to the set of ID numbers of seen messages stored in WHICH_STORE."""
+    the_set = _get_id_set(which_store)
+    the_set |= { id_num }
+    _store_id_set(which_store, the_set)
+
+def seen_message(message_store, message_id):
+    """Return True if the id MESSAGE_ID is in the MESSAGE_STORE data set, or
+    False otherwise. Each MESSAGE_STORE file is a pickled set of IDs of messages
+    already seen by the script.
     """
-    substitution_list = [['\n', ' '],               # Newline to space
-                         ['  ', ' '],               # Two spaces to one space
-                         ['U.S.A.', 'U․S․A․'],       # Periods to one-dot leaders
-                         ['U. S. A.', 'U․S․A․'],    # Periods to one-dot leaders, remove spaces
-                         ['U. S.', 'U․S․'],         # Periods to one-dot leaders, remove spaces
-                         ['U.S.', 'U․S․'],          # Periods to one-dot leaders
-                         ['P․M․', 'P․M․'],          # Again
-                         ['A․M․', 'A․M․'],          # Again
-                         ['V.P.', 'V․P․'],          # Again
-                         ['Mr.', 'Mr․'],            # Again
-                         ['Dr.', 'Dr․'],            # Again
-                         ['Mrs.', 'Mrs․'],          # Again
-                         ['Ms.', 'Ms․'],            # Again
-                         ['Rev.', 'Rev․'],          # Again
-                        ]
-    the_tweet.text = html.unescape(th.multi_replace(the_tweet.text, substitution_list))
-    return the_tweet
+    try:
+        return message_id in _get_id_set(message_store)
+    except Exception:   # If we can't verify we haven't seen it, ignore it. Don't bother people due to technical errors on our end.
+        log_it("WARNING: data store '%s' doesn't exist or is unreadable; creating empty store ... " % message_store, 2)
+        with open(message_store, 'wb') as msg_file:
+            pickle.dump(msg_file, set([]))
+        return None     # signal that something went wrong, and calling function will have to deal with it.
 
-def massage_tweets(the_tweets):
-    """Make the tweets more suitable for feeding into the Markov-chain generator.
-    Currently, this just drops tweets that have URLS or @mentions, but a more
-    nuanced approach would be great in the future.
+def _get_all_messages(source):
+    """Get the set of all messages from the specified SOURCE, ever (or, at least as
+    far back as the Twitter API will let us go).
     """
-    ret = [normalize(t) for t in the_tweets if not filter_tweet(t.text)]
+    ret = [][:]
+    got_some = False
+    while not ret and not got_some:
+        new_msgs =[ m for m in source() ]
+        got_some = True
+        for item in new_msgs:
+            if item not in ret:
+                ret += [item]
     return ret
 
-def save_tweets(the_tweets):
-    """Save the text from THE_TWEETS to a text file, and update the stored data.
-    THE_TWEETS is a list of Tweets.
+def _get_all_DMs(lowest_id=-1):
+    """Get a list of all DMs, ever; or, all DMs after the optional
+    LOWEST_ID parameter.
     """
-    if len(the_tweets) == 0:        # If there are no new tweets, don't do anything
-        return
-    with open('%s/%s.txt' % (donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w') as f:
-        f.writelines(['%s\n' % tweet.text for tweet in the_tweets])
-    set_data_value('last_update_date', datetime.datetime.now())     # then, update the database of tweet-record filenames and ID numbers
+    return [ dm for dm in _get_all_messages(lambda: the_API.direct_messages(count=100, full_text=True, since_id=lowest_id)) ]
 
-def _num_tweet_files():
-    """Convenience function to return the number of files in which The Donald's
-    tweets are stored.
+def _get_all_mentions():
+    """Get a list of all @mentions, ever."""
+    return [ m for m in _get_all_messages(lambda: the_API.mentions_timeline(count=100)) ]
+
+def learn_all_DMs():
+    """Get a list of all the DMs that have ever been sent, and add them to the list
+    of DMs we've ever seen. This only happens automatically if the DM store is
+    recreated, on the theory that we shouldn't bother people by responding to
+    DMs that have already been responded to just because some technical error on
+    our end has caused the DM store to become unreadable.
     """
-    return len(glob.glob('%s/*txt' % donnies_tweets_dir))
+    _store_id_set(DMs_store, {dm.id for dm in _get_all_DMs()})
 
-def update_tweet_collection():
-    """Update the tweet collection."""
-    log_it("INFO: updating tweet collection")
-    t = get_new_tweets(screen_name=target_twitter_id, oldest=get_newest_tweet_id())
-    t = massage_tweets(t)
-    save_tweets(t)
-
-def update_tweet_collection_if_necessary():
-    """Once in a while, import new tweets encoding the brilliance that The Donald &
-    his team have graced the world by sharing.
+def learn_all_mentions():
+    """Get a list of all @mentions that have ever been sent, and add them to the
+    set of @mentions we've ever seen. This only happens automatically under the
+    same circumstances and for the same reasons as with learn_all_DMs(), above.
     """
-    if _num_tweet_files == 0 or (datetime.datetime.now() - get_last_update_date()).days > 30 or random.random() < 0.003 or force_download:
-        update_tweet_collection()
+    _store_id_set(mentions_store, {m.id for m in _get_all_mentions()})
 
+def seen_DM(message_id):
+    """Return True if the DM has been seen before, False otherwise. If the data store
+    of seen DMs does not exist, it's created, and all DMs ever sent are treated
+    as seen.
+    """
+    ret = seen_message(DMs_store, message_id)
+    if ret is None:
+        learn_all_DMs()
+        ret = True
+    return ret
+
+def seen_mention(message_id):
+    """Return True if we have seen and processed the @mention before, or False if
+    it's new to us. If the data store of seen @mentions does not exist, it's
+    created, and all @mentions ever sent are learned.
+    """
+    ret = seen_message(mentions_store, message_id)
+    if ret is None:
+        learn_all_mentions()
+        ret = True
+    return ret
+
+
+# This next group of functions handles the actual creation of tweets based on our stored copies of The Donald's tweets
 def did_donnie_say_it(what):
     """Return True if WHAT has appeared in the Trump tweets we know about, or
     False otherwise.
@@ -241,7 +258,7 @@ def did_donnie_say_it(what):
     try:
         ret = False
         donnies_wisdom_files = glob.glob('%s/*txt' % donnies_tweets_dir)
-        while not ret and len(donnies_wisdom_files) != 0:   # Check files one by one until we find that donnie said it, or run out of files.
+        while not ret and len(donnies_wisdom_files) != 0:   # Check files one by one until we find that Donnie said it, or run out of files.
             which_file = donnies_wisdom_files.pop()
             with open(which_file) as the_file:
                 ret = what.strip().lower() in ' '.join([ the_line.strip().lower() for the_line in the_file.readlines() ])
@@ -250,8 +267,7 @@ def did_donnie_say_it(what):
         return False
 
 def did_we_say_it(what):
-    """Return True if we've previously tweeted WHAT, or False otherwise.
-    """
+    """Return True if we've previously tweeted WHAT, or False otherwise."""
     try:
         with open(tweets_store) as the_file:
             return what.strip().lower() in ' '.join([ line.strip().lower() for line in the_file.readlines ])
@@ -269,9 +285,9 @@ def validate_tweet(the_tweet):
         * is exactly the same as a tweet by The Donald.
         * is identical to a previous tweet by this account
     """
-    log_it("INFO: function validate_tweet() called", 2)
+    log_it("INFO: function validate_tweet() called", 3)
     if not len(the_tweet) in range(20,141):
-        log_it('INFO; rejecting tweet "%s" because its length is %d' % (the_tweet, len(the_tweet)), 2)
+        log_it('INFO; rejecting tweet "%s" because its length is %d' % (the_tweet, len(the_tweet)), 3)
         return False
     if did_donnie_say_it(the_tweet):
         log_it('INFO: rejecting tweet "%s" because The Donald has said exactly that.' % the_tweet, 2)
@@ -284,7 +300,7 @@ def validate_tweet(the_tweet):
 
 def get_tweet(starts, the_mapping):
     """Produces a tweet by repeatedly calling the text generator with varying
-    parameters until it coughs up something in the right length range.
+    parameters until it coughs up something that validate_tweet() approves of.
     """
     got_tweet = False
     while not got_tweet:
@@ -310,9 +326,123 @@ def tweet(text):
     with open(tweets_store, 'w') as the_file:
         the_file.writelines(the_lines)
 
-def process_command(command, issuer_id, tweet_id):
-    """Process a command coming from my own twitter account.
+
+# This next group of functions handles the downloading, processing, and storing of The Donald's tweets.
+def get_new_tweets(screen_name=target_twitter_id, oldest=-1):
+    """Get those tweets newer than the tweet whose ID is specified as the OLDEST
+    parameter from the account SCREEN_NAME.
     """
+    # get most recent tweets (200 is maximum possible at once)
+    new_tweets = the_API.user_timeline(screen_name=screen_name, count=200)
+    ret = new_tweets.copy()
+
+    oldest_tweet = ret[-1].id - 1  # save the id of the tweet before the oldest tweet
+
+    # keep grabbing tweets until there are no tweets left
+    while len(new_tweets) > 0 and oldest < new_tweets[0].id:
+        log_it("getting all tweets before ID #%s" % (oldest_tweet))
+        new_tweets = the_API.user_timeline(screen_name=screen_name, count=200, max_id=oldest_tweet)
+        ret.extend(new_tweets)
+        oldest_tweet = ret[-1].id - 1
+        log_it("    ...%s tweets downloaded so far" % (len(ret)))
+    set_data_value('newest_tweet_id', max([t.id for t in ret]))
+    return [t for t in ret if (t.id > oldest)]
+
+def filter_tweet(tweet_text):
+    """Returns True if a tweet from The Donald should be filtered (i.e., eliminated
+    from the list of tweets that the script is aware of), or False if it should
+    not be filtered (i.e., should remain in the list).
+
+    Currently, just eliminates tweets with URLs and tweets that @mention any
+    account other than @realDonaldTrump (i.e., when The Donald talks about, or to,
+    anyone else -- we don't want this account interacting with people just because
+    The Donald does. The Donald is a terrible model for appropriate behavior
+    in many, many ways).
+
+    However, there may need to be more nuanced behavior in the future.
+    """
+    if 't.co' in tweet_text:  # Assumption: all URLs coming from Twitter contain Twitter's redirection domain.
+        return True  # At this time, the text generator doesn't deal well with input text containing URLs.
+    elif '@' in tweet_text:  # Since more than one @mention can occur in a tweet ...
+        mentions = list(set([w for w in tweet_text.split() if '@' in w]))  # Make a list of all unique @mentions
+        if len(
+                mentions) == 1:  # Allow The Donald to talk about himself (& not other people) without filtering those tweets out.
+            return not (th.strip_leading_and_trailing_punctuation(
+                mentions[0].strip()).strip().lower() == target_twitter_id.strip().lower())
+        else:  # Filter out tweets mentioning more than one person:
+            return True  # by def'n, they're not just The Donald being self-aggrandizing.
+    return False
+
+def normalize(the_tweet):
+    """Convert THE_TWEET into a normalized form, based on the replacements in
+    SUBSTITUTION_LIST (specified below). All substitutions are applied repeatedly,
+    in the order they appear in the list, until none of them produces a change.
+    HTML/XML entities are also unescaped, and any necessary other transformations
+    are applied (as of 14 Jan 2017, that's NONE for other transformations, but that
+    might change in the future.
+
+    THE_TWEET is a Tweepy tweet object, not a string.
+    """
+    substitution_list = [['\n', ' '],  # Newline to space
+                         ['  ', ' '],  # Two spaces to one space
+                         ['U.S.A.', 'U․S․A․'],  # Periods to one-dot leaders
+                         ['U. S. A.', 'U․S․A․'],  # Periods to one-dot leaders, remove spaces
+                         ['U. S.', 'U․S․'],  # Periods to one-dot leaders, remove spaces
+                         ['U.S.', 'U․S․'],  # Periods to one-dot leaders
+                         ['P․M․', 'P․M․'],  # Again
+                         ['A․M․', 'A․M․'],  # Again
+                         ['V.P.', 'V․P․'],  # Again
+                         ['Mr.', 'Mr․'],  # Again
+                         ['Dr.', 'Dr․'],  # Again
+                         ['Mrs.', 'Mrs․'],  # Again
+                         ['Ms.', 'Ms․'],  # Again
+                         ['Rev.', 'Rev․'],  # Again
+                         [' \n', '\n'],  # Space-then-newline to newline
+                         ['....', '...'],  # Four periods to three periods
+                         ['...', '…'],  # Three periods to ellipsis
+                         ['….', '…'],   # Ellipsis-period to ellipsis. …. may be allowable, but is unlikely for Donnie.
+                         ]
+    the_tweet.text = th.multi_replace(html.unescape(th.multi_replace(the_tweet.text, substitution_list)), substitution_list)
+    return the_tweet
+
+def massage_tweets(the_tweets):
+    """Make the tweets more suitable for feeding into the Markov-chain generator.
+    Part of this involves silently dropping tweets that can't effectively be used
+    by the Markov chain-based generator; once this is done, the remaining tweets
+    are passed through normalize().
+    """
+    return [normalize(t) for t in the_tweets if not filter_tweet(t.text)]
+
+def save_tweets(the_tweets):
+    """Save the text from THE_TWEETS to a text file, and update the stored data.
+    THE_TWEETS is a list of Tweets.
+    """
+    if len(the_tweets) == 0:  # If there are no new tweets, don't do anything
+        return
+    with open('%s/%s.txt' % (donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w') as f:
+        f.writelines(['%s\n' % tweet.text for tweet in the_tweets])
+    set_data_value('last_update_date',
+                   datetime.datetime.now())  # then, update the database of tweet-record filenames and ID numbers
+
+def update_tweet_collection():
+    """Update the tweet collection."""
+    log_it("INFO: updating tweet collection")
+    t = get_new_tweets(screen_name=target_twitter_id, oldest=get_newest_tweet_id())
+    t = massage_tweets(t)
+    save_tweets(t)
+
+def update_tweet_collection_if_necessary():
+    """Once in a while, import new tweets encoding the brilliance that The Donald &
+    his team have graced the world by sharing.
+    """
+    if _num_tweet_files() == 0 or (
+        datetime.datetime.now() - get_last_update_date()).days > 30 or random.random() < 0.003 or force_download:
+        update_tweet_collection()
+
+
+# The next group of functions handles user interaction via DMs and @mentions, and handles commands from me.
+def process_command(command, issuer_id, tweet_id):
+    """Process a command coming from my own Twitter account."""
     command_parts = [c.strip().lower() for c in command.strip().split() if not c.strip().startswith('@')]
     if command_parts[0] in ['stop', 'quiet', 'silence']:
         set_data_value('stopped', True)
@@ -329,8 +459,7 @@ def process_command(command, issuer_id, tweet_id):
         sm.send_DM(the_API=the_API, text="Sorry, sir. I didn't understand that.", user=issuer_id)
 
 def handle_mention(mention):
-    """Process the mention in whatever way is appropriate.
-    """
+    """Process the @mention in whatever way is appropriate."""
     log_it("INFO: Handling mention ID #%d" % mention.id)
     log_it("text is: %s" % mention.text)
     log_it("user is: @%s" % mention.user.screen_name)
@@ -339,17 +468,16 @@ def handle_mention(mention):
     elif mention.user.screen_name.strip('@').lower().strip() == target_twitter_id:
         log_it("Oh my! The Donald is speaking! Click your jackboots together and salute!")
         sm.modified_retweet('LOL\n\n', user_id=target_twitter_id, tweet_id=mention.id)
-        sm.modified_retweet('LOL\n\n', user_id=target_twitter_id, tweet_id=mention.id)
     else:
         log_it('WARNING: unhandled mention from user @%s' % mention.user.screen_name)
         log_it("the tweet is: %s" % mention.text)
+    remember_id(mentions_store, mention.id)
+    set_data_value('last_mention_id', max(mention.id, get_newest_mention_id()))
 
 def check_mentions():
-    """A stub to check for any @mentions and, if necessary, reply to them.
-    """
-    for mention in [m for m in the_API.mentions_timeline(count=100) if m.id > get_newest_mention_id()]:
+    """A stub to check for any @mentions and, if necessary, reply to them."""
+    for mention in [m for m in _get_all_mentions() if m.id > get_newest_mention_id()]:
         handle_mention(mention)
-        set_data_value('last_mention_id', max(mention.id, get_newest_mention_id()))
 
 def handle_dm(direct_message):
     """Handle a given direct message. Currently, it just treats any DM from me as a
@@ -367,18 +495,17 @@ def handle_dm(direct_message):
         log_it(pprint.pformat(direct_message))
         log_it("Replying with default message")
         sm.send_DM(the_API=the_API, text="Sorry, I'm a bot and don't process direct messages. If you need to reach my human minder, he's @patrick_mooney.", user=direct_message.sender_screen_name)
+    remember_id(DMs_store, direct_message.id)
     set_data_value('last_dm_id', max(direct_message.id, get_newest_dm_id()))
 
 def check_DMs():
-    """Check and handle any direct messages.
-    """
-    for dm in [dm for dm in the_API.direct_messages(count=100, full_text=True, since_id=get_newest_dm_id()) if dm.id > get_newest_dm_id()]:
+    """Check and handle any direct messages."""
+    for dm in [dm for dm in _get_all_DMs(lowest_id=get_newest_dm_id())]:
         handle_dm(dm)
 
 def set_up():
-    """Perform pre-tweeting tasks. Currently (as of 1 Jan 2017), it just updates the
-    collection of stored tweets, but in the future it will check for other types of
-    things, like user interaction.
+    """Perform pre-tweeting tasks: updates the collection of stored tweets;
+    checks for new @mentions and DMs.
     """
     update_tweet_collection_if_necessary()
     check_mentions()
