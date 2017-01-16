@@ -241,7 +241,9 @@ def seen_DM(message_id):
 def seen_mention(message_id):
     """Return True if we have seen and processed the @mention before, or False if
     it's new to us. If the data store of seen @mentions does not exist, it's
-    created, and all @mentions ever sent are learned.
+    created, and all @mentions ever sent are remembered and assumed to have
+    been processed already: we don't want to bother people by interacting with
+    them again for a @mention we've already responded to.
     """
     ret = seen_message(mentions_store, message_id)
     if ret is None:
@@ -281,13 +283,13 @@ def validate_tweet(the_tweet):
     Currently, the function approves all tweets, unless they meet any of the
     following criteria:
 
-        * length is not in range(20,141)
-        * is exactly the same as a tweet by The Donald.
-        * is identical to a previous tweet by this account
+        * length of tweet is not in range(20,141)
+        * tweet is exactly the same as a tweet by The Donald.
+        * tweet is identical to a previous tweet by this account
     """
     log_it("INFO: function validate_tweet() called", 3)
-    if not len(the_tweet) in range(20,141):
-        log_it('INFO; rejecting tweet "%s" because its length is %d' % (the_tweet, len(the_tweet)), 3)
+    if not len(the_tweet.strip()) in range(20,141):
+        log_it('INFO; rejecting tweet "%s" because its length is %d' % (the_tweet, len(the_tweet.strip())), 3)
         return False
     if did_donnie_say_it(the_tweet):
         log_it('INFO: rejecting tweet "%s" because The Donald has said exactly that.' % the_tweet, 2)
@@ -295,12 +297,13 @@ def validate_tweet(the_tweet):
     if did_we_say_it(the_tweet):
         log_it('INFO: rejecting tweet "%s" because we\'ve previously said precisely that.' % the_tweet, 2)
         return False
-    log_it('INFO: approving tweet "%s".' % the_tweet, 2)
+    log_it('INFO: approving tweet "%s".' % the_tweet, 3)
     return True
 
 def get_tweet(starts, the_mapping):
     """Produces a tweet by repeatedly calling the text generator with varying
-    parameters until it coughs up something that validate_tweet() approves of.
+    parameters until it just so happens that it coughs up something that
+    validate_tweet() approves of.
     """
     got_tweet = False
     while not got_tweet:
@@ -401,15 +404,18 @@ def normalize(the_tweet):
                          ['....', '...'],  # Four periods to three periods
                          ['...', '…'],  # Three periods to ellipsis
                          ['….', '…'],   # Ellipsis-period to ellipsis. …. may be allowable, but is unlikely for Donnie.
+                         ['……', '…'],   # Double-ellipsis to ellipsis.
+                         ['… …', '…'],  # Double-ellipsis-with-space to ellipsis
                          ]
     the_tweet.text = th.multi_replace(html.unescape(th.multi_replace(the_tweet.text, substitution_list)), substitution_list)
     return the_tweet
 
 def massage_tweets(the_tweets):
-    """Make the tweets more suitable for feeding into the Markov-chain generator.
-    Part of this involves silently dropping tweets that can't effectively be used
-    by the Markov chain-based generator; once this is done, the remaining tweets
-    are passed through normalize().
+    """Make tweets The Donald more suitable for feeding into the Markov-chain,
+    generator. Part of this involves silently dropping tweets that can't
+    effectively be used by the Markov chain-based generator; once this is done,
+    the remaining tweets are passed through normalize() to smooth out their
+    remaining rough edges.
     """
     return [normalize(t) for t in the_tweets if not filter_tweet(t.text)]
 
