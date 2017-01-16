@@ -4,9 +4,9 @@ Patrick Mooney, 13 January 2017.
 
 
 
-This script produce the content for <a rel="me muse" href="https://twitter.com/false_trump">the @false_trump Twitter account</a>. This account contains randomly generated text produced by a Markov chain-based text generator trained on the actual tweets of Donald Trump (i.e., @realDonaldTrump) and his staff of jackbooted goons.. 
+This script produce the content for <a rel="me muse" href="https://twitter.com/false_trump">the @false_trump Twitter account</a>. This account contains randomly generated text produced by a Markov chain-based text generator trained on the actual tweets of Donald Trump (i.e., @realDonaldTrump) and his staff of jackbooted goons (er ... talented, ambitious, and spectacularly brilliant staff, each member of whom, it is clear, is highly respected by the man at the top).
 
-The script is available for your use under the GPL v3 or (at your choice) any later version.
+This software is alpha-stage software currently under development and the author assumes NO LIABILITY OF ANY KIND for its use. However, should you want to adapt it, this software is available for your use under the GPL v3 or (at your choice) any later version.
 
 Quick links:
 <ul>
