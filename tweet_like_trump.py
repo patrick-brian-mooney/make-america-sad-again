@@ -526,6 +526,7 @@ if __name__ == '__main__':
         for the_file in glob.glob('%s/*txt' % donnies_tweets_dir):
             donnies_words += sg.word_list(the_file)
         starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
-        tweet(get_tweet(starts, the_mapping))
+        the_tweet = get_tweet(starts, the_mapping)
+        tweet(the_tweet)
     else:
         log_it('INFO: not tweeting because dice roll failed')
