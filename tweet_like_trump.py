@@ -16,41 +16,36 @@ under the GPL, either version 3 or (at your option) any later version. See the
 file LICENSE.md for details.
 """
 
+import datetime, sys, pprint, glob, random, html, pickle, csv, tempfile, os
 
-
-import datetime, sys, pprint, glob, random, html, pickle
-
-import tweepy                               # https://github.com/tweepy/tweepy
+import tweepy  # https://github.com/tweepy/tweepy
 
 from social_media_auth import Trump_client
-        # That's an unshared file that contains my authentication constants for various social media platforms.
+# That's an unshared file that contains my authentication constants for various social media platforms.
 
-import social_media as sm                   # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/social_media.py
-import sentence_generator as sg             # https://github.com/patrick-brian-mooney/markov-sentence-generator
-import text_handling as th                  # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/text_handling.py
-import patrick_logger                       # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/patrick_logger.py
+import social_media as sm  # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/social_media.py
+import sentence_generator as sg  # https://github.com/patrick-brian-mooney/markov-sentence-generator
+import text_handling as th  # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/text_handling.py
+import patrick_logger  # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/patrick_logger.py
 from patrick_logger import log_it
 
+patrick_logger.verbosity_level = 2  # As of 14 January 2017, 3 is the highest meaningful level for this script
+force_download = False  # Set to True to always check for new tweets from Trump .
+force_tweet = True  # Skip the dice roll; definitely post a new tweet every time the script is run.
 
-
-patrick_logger.verbosity_level = 2          # As of 14 January 2017, 3 is the highest meaningful level for this script
-force_download          = False             # Set to True to always check for new tweets from Trump .
-force_tweet             = True              # Skip the dice roll; definitely post a new tweet every time the script is run.
-
-base_dir                = '/TrumpTweets'
-data_dir                = '%s/data' % base_dir
-data_store              = '%s/TrumpTweets_data.pkl' % data_dir
-tweets_store            = "%s/our_tweets.txt" % data_dir
-DMs_store               = '%s/seen_DMs.pkl' % data_dir
-mentions_store          = '%s/seen_mentions.pkl' % data_dir
-donnies_tweets_dir      = "%s/donnies_tweets" % data_dir
+base_dir = '/TrumpTweets'
+data_dir = '%s/data' % base_dir
+data_store = '%s/TrumpTweets_data.pkl' % data_dir
+tweets_store = "%s/our_tweets.csv" % data_dir
+DMs_store = '%s/seen_DMs.pkl' % data_dir
+mentions_store = '%s/seen_mentions.pkl' % data_dir
+donnies_tweets_dir = "%s/donnies_tweets" % data_dir
 
 markov_length = 2
 
-programmer_twitter_id   = 'patrick_mooney'    # That's me, the author of this script: @patrick_mooney
-target_twitter_id       = 'realDonaldTrump'   # That's the person whose tweets we're monitoring and imitating: @realDonaldTrump
-my_twitter_id           = 'false_trump'       # That's the Twitter username under which the script posts: @herr_drumpf
-
+programmer_twitter_id = 'patrick_mooney'  # That's me, the author of this script: @patrick_mooney
+target_twitter_id = 'realDonaldTrump'  # That's the person whose tweets we're monitoring and imitating: @realDonaldTrump
+my_twitter_id = 'false_trump'  # That's the Twitter username under which the script posts: @false_trump
 
 
 def _get_new_API():
@@ -69,7 +64,7 @@ def _num_tweet_files():
     """Convenience function to return the number of files in which The Donald's
     tweets are stored.
     """
-    return len(glob.glob('%s/*txt' % donnies_tweets_dir))
+    return len(glob.glob('%s/*csv' % donnies_tweets_dir))
 
 
 # This next group of functions handles storing and retrieving basic program operation parameters (persistent globals).
@@ -89,7 +84,7 @@ def _get_data_store():
                     'program author': 'Patrick Mooney',
                     'script URL': 'https://github.com/patrick-brian-mooney/make-america-sad-again',
                     'author twitter ID': '@patrick_mooney',
-                   }
+                    }
         with open(data_store, 'wb') as the_data_file:
             pickle.dump(the_data, the_data_file)
         return the_data
@@ -127,13 +122,55 @@ def get_key_value_with_default(key_name, default=None):
     """
     try:
         ret = get_data_value(key_name)
-        if ret == None and default is not None:             # If necessary, set the default value.
+        if ret == None and default is not None:  # If necessary, set the default value.
             set_data_value(key_name, default)
             ret = default
         return ret
     except Exception as err:
         log_it('WARNING: get_key_value_with_default() encountered exception "%s"; returning default value "%s"' % (err, default), 1)
         return default
+
+
+# This next group of functions deals with stored tweet files.
+# These files are .csv files with three columns. Each row has the structure:
+#       [ tweet text, tweet ID, tweet date ]
+def _all_donnies_tweet_files():
+    """Convenience function to return a list of all files The Donald's tweets are
+    stored in.
+
+    :return: a list of these files.
+    """
+    return glob.glob("%s/*csv" % donnies_tweets_dir)
+
+def _get_tweet_archive_text(archive_file):
+    """Returns the full text, and nothing but the text, of all tweets stored in
+    a tweet archive .csv file, which stores the text of the tweets in the first
+    column of the file.
+
+    :return: a string containing the archive of all of our tweets.
+    """
+    with open(tweets_store, newline='') as csvfile:
+        csvreader = csv.reader(csvfile)
+        return '\n'.join([row[0] for row in csvreader])
+
+def get_our_tweet_text():
+    """ Returns the full text of all tweets this script has created and stored.
+
+    :return: a string containing the archive of all of our tweets.
+    """
+    return _get_tweet_archive_text(tweets_store)
+
+def get_donnies_tweet_text():
+    """Returns the full text of all of The Donald's tweets that this script is
+    aware of.
+
+    :return: a string containing the text of all such tweets.
+    """
+    ret = ""
+    for which_file in _all_donnies_tweet_files():
+        ret += _get_tweet_archive_text(which_file)
+    return ret
+
 
 # This next group is a set of convenience functions that returns specific keys from the data store.
 def get_newest_tweet_id():
@@ -157,6 +194,7 @@ def get_newest_mention_id():
 
 def get_newest_dm_id():
     """Returns the ID of the most recently seen DM."""
+    set_data_value('last_dm_id', max(max(_get_id_set(DMs_store)), get_key_value_with_default('last_dm_id')))
     return get_key_value_with_default('last_dm_id', default=-1)
 
 
@@ -176,7 +214,7 @@ def _store_id_set(which_store, the_set):
 def remember_id(which_store, id_num):
     """Add ID_NUM to the set of ID numbers of seen messages stored in WHICH_STORE."""
     the_set = _get_id_set(which_store)
-    the_set |= { id_num }
+    the_set |= {id_num}
     _store_id_set(which_store, the_set)
 
 def seen_message(message_store, message_id):
@@ -186,11 +224,11 @@ def seen_message(message_store, message_id):
     """
     try:
         return message_id in _get_id_set(message_store)
-    except Exception:   # If we can't verify we haven't seen it, ignore it. Don't bother people due to technical errors on our end.
+    except Exception:  # If we can't verify we haven't seen it, ignore it. Don't bother people due to technical errors on our end.
         log_it("WARNING: data store '%s' doesn't exist or is unreadable; creating empty store ... " % message_store, 2)
         with open(message_store, 'wb') as msg_file:
             pickle.dump(msg_file, set([]))
-        return None     # signal that something went wrong, and calling function will have to deal with it.
+        return None  # signal that something went wrong, and calling function will have to deal with it.
 
 def _get_all_messages(source):
     """Get the set of all messages from the specified SOURCE, ever (or, at least as
@@ -199,7 +237,7 @@ def _get_all_messages(source):
     ret = [][:]
     got_some = False
     while not ret and not got_some:
-        new_msgs =[ m for m in source() ]
+        new_msgs = [m for m in source()]
         got_some = True
         for item in new_msgs:
             if item not in ret:
@@ -210,11 +248,11 @@ def _get_all_DMs(lowest_id=-1):
     """Get a list of all DMs, ever; or, all DMs after the optional
     LOWEST_ID parameter.
     """
-    return [ dm for dm in _get_all_messages(lambda: the_API.direct_messages(count=100, full_text=True, since_id=lowest_id)) ]
+    return [dm for dm in _get_all_messages(lambda: the_API.direct_messages(count=100, full_text=True, since_id=lowest_id))]
 
 def _get_all_mentions():
     """Get a list of all @mentions, ever."""
-    return [ m for m in _get_all_messages(lambda: the_API.mentions_timeline(count=100)) ]
+    return [m for m in _get_all_messages(lambda: the_API.mentions_timeline(count=100))]
 
 def learn_all_DMs():
     """Get a list of all the DMs that have ever been sent, and add them to the list
@@ -265,13 +303,7 @@ def did_donnie_say_it(what):
     False otherwise.
     """
     try:
-        ret = False
-        donnies_wisdom_files = glob.glob('%s/*txt' % donnies_tweets_dir)
-        while not ret and len(donnies_wisdom_files) != 0:   # Check files one by one until we find that Donnie said it, or run out of files.
-            which_file = donnies_wisdom_files.pop()
-            with open(which_file) as the_file:
-                ret = what.strip().lower() in ' '.join([ the_line.strip().lower() for the_line in the_file.readlines() ])
-        return ret
+        return (what.strip().lower() in get_donnies_tweet_text().strip().lower())
     except Exception as err:
         log_it("WARNING: did_donnie_say_it() encountered error '%s'; assuming he didn't say it" % err, 2)
         return False
@@ -279,8 +311,7 @@ def did_donnie_say_it(what):
 def did_we_say_it(what):
     """Return True if we've previously tweeted WHAT, or False otherwise."""
     try:
-        with open(tweets_store) as the_file:
-            return what.strip().lower() in ' '.join([ line.strip().lower() for line in the_file.readlines() ])
+        return (what.strip().lower() in get_our_tweet_text().strip().lower())
     except Exception as err:
         log_it("WARNING: did_we_say_it() encountered error '%s'; assuming we didn't say it" % err, 2)
         return False
@@ -297,7 +328,7 @@ def validate_tweet(the_tweet):
         * tweet is identical to a previous tweet by this account
     """
     log_it("INFO: function validate_tweet() called", 3)
-    if not len(the_tweet.strip()) in range(20,141):
+    if not len(the_tweet.strip()) in range(20, 141):
         log_it('INFO; rejecting tweet "%s" because its length is %d' % (the_tweet, len(the_tweet.strip())), 3)
         return False
     if did_donnie_say_it(the_tweet):
@@ -316,27 +347,25 @@ def get_tweet(starts, the_mapping):
     """
     got_tweet = False
     while not got_tweet:
-        sents = random.choice(range(1,5))
+        sents = random.choice(range(1, 5))
         log_it("Generating a tweet (%d sentences) ..." % sents)
         the_tweet = sg.gen_text(the_mapping, starts, markov_length=markov_length, sentences_desired=sents)
         got_tweet = validate_tweet(the_tweet)
         log_it("length is %d" % len(the_tweet))
     return the_tweet
 
-def tweet(text):
+def tweet(text, id=None, date=None):
     """Post a tweet. Also, add the tweet to the list of tweets created so far by
     the script.
     """
-    log_it("Tweet is: %s" % text)
-    sm.post_tweet(Trump_client, text)
-    try:
-        with open(tweets_store) as the_file:
-            the_lines = the_file.readlines()
-    except Exception:
-        the_lines = [][:]
-    the_lines += [ text + '\n' ]
-    with open(tweets_store, 'w') as the_file:
-        the_file.writelines(the_lines)
+    log_it("Tweet is: '%s'. Posting ..." % text)
+    the_status = sm.post_tweet(Trump_client, text)
+
+    log_it("Adding that tweet to our tweet archive")
+    with open(tweets_store, mode='a', newline='') as archive_file:
+        writer = csv.writer(archive_file)
+        writer.writerow([the_status.text, the_status.id, str(the_status.created_at)])
+    the_lines = get_donnies_tweet_text().split('\n')
 
 
 # This next group of functions handles the downloading, processing, and storing of The Donald's tweets.
@@ -383,6 +412,7 @@ def filter_tweet(tweet_text):
             return True  # by def'n, they're not just The Donald being self-aggrandizing.
     return False
 
+
 def normalize(the_tweet):
     """Convert THE_TWEET into a normalized form, based on the replacements in
     SUBSTITUTION_LIST (specified below). All substitutions are applied repeatedly,
@@ -427,12 +457,12 @@ def normalize(the_tweet):
                          ['\.\.\.\.', '\.\.\.'],  # Four periods to three periods
                          ['\.\.', '\.'],  # Two periods to one period
                          ['\.\.\.', '…'],  # Three periods to ellipsis
-                         ['…\.', '…'],   # Ellipsis-period to ellipsis. …. may be allowable, but is unlikely for Donnie.
-                         ['……', '…'],   # Double-ellipsis to ellipsis.
+                         ['…\.', '…'],  # Ellipsis-period to ellipsis. …. may be allowable, but is unlikely for Donnie.
+                         ['……', '…'],  # Double-ellipsis to ellipsis.
                          ['… …', '…'],  # Double-ellipsis-with-space to ellipsis
                         ]
     the_tweet.text = sg.process_acronyms(the_tweet.text)
-    the_tweet.text = th.multi_replace(html.unescape(th.multi_replace(the_tweet.text, substitution_list)), substitution_list)
+    the_tweet.text = th.multi_replace(html.unescape(th.multi_replace(the_tweet.text, substitution_list)),substitution_list)
     return the_tweet
 
 def massage_tweets(the_tweets):
@@ -445,13 +475,18 @@ def massage_tweets(the_tweets):
     return [normalize(t) for t in the_tweets if not filter_tweet(t.text)]
 
 def save_tweets(the_tweets):
-    """Save the text from THE_TWEETS to a text file, and update the stored data.
-    THE_TWEETS is a list of Tweets.
+    """Save the text from THE_TWEETS to a CSV file, and update the stored data.
+    THE_TWEETS is a list of tweepy.Tweet objects, not strings.
+
+    See the function get_our_tweet_text(), above, for a declaration of the format
+    of the .csv file.
     """
     if len(the_tweets) == 0:  # If there are no new tweets, don't do anything
         return
-    with open('%s/%s.txt' % (donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w') as f:
-        f.writelines(['%s\n' % tweet.text for tweet in the_tweets])
+    with open('%s/%s.csv' % (donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w', newline="") as f:
+        csvwriter = csv.writer(f)
+        for t in the_tweets:
+            csvwriter.writerow([t.text, t.id_str, t.created_at])
     set_data_value('last_update_date', datetime.datetime.now())  # then, update the database of tweet-record filenames and ID numbers
 
 def update_tweet_collection():
@@ -470,7 +505,7 @@ def update_tweet_collection_if_necessary():
 
 
 # The next group of functions handles user interaction via DMs and @mentions, and handles commands from me.
-def process_command(command, issuer_id, tweet_id):
+def process_command(command, issuer_id):
     """Process a command coming from my own Twitter account."""
     command_parts = [c.strip().lower() for c in command.strip().split() if not c.strip().startswith('@')]
     if command_parts[0] in ['stop', 'quiet', 'silence']:
@@ -493,7 +528,9 @@ def handle_mention(mention):
     log_it("text is: %s" % mention.text)
     log_it("user is: @%s" % mention.user.screen_name)
     if mention.user.screen_name.strip('@').lower() == programmer_twitter_id.strip('@').lower():
-        process_command(mention.text, issuer_id=programmer_twitter_id, tweet_id=mention.id)
+        remember_id(mentions_store, mention.id) # Force-learn it now: commands can force-terminate the script.
+        set_data_value('last_mention_id', max(mention.id, get_newest_mention_id()))
+        process_command(mention.text, issuer_id=programmer_twitter_id)
     elif mention.user.screen_name.strip('@').lower().strip() == target_twitter_id:
         log_it("Oh my! The Donald is speaking! Click your jackboots together and salute!")
         sm.modified_retweet('LOL\n\n', user_id=target_twitter_id, tweet_id=mention.id)
@@ -518,18 +555,20 @@ def handle_dm(direct_message):
     log_it("text is: %s" % direct_message.text)
     log_it("user is: @%s" % direct_message.sender_screen_name)
     if direct_message.sender_screen_name.lower().strip('@') == programmer_twitter_id.lower().strip('@'):
-        process_command(direct_message.text, issuer_id=programmer_twitter_id, tweet_id=direct_message.id)
+        process_command(direct_message.text, issuer_id=programmer_twitter_id)
     else:
         log_it("WARNING: unhandled DM detected:")
         log_it(pprint.pformat(direct_message))
         log_it("Replying with default message")
-        sm.send_DM(the_API=the_API, text="Sorry, I'm a bot and don't process direct messages. If you need to reach my human minder, he's @patrick_mooney.", user=direct_message.sender_screen_name)
+        sm.send_DM(the_API=the_API,
+                   text="Sorry, I'm a bot and don't process direct messages. If you need to reach my human minder, he's @patrick_mooney.",
+                   user=direct_message.sender_screen_name)
     remember_id(DMs_store, direct_message.id)
     set_data_value('last_dm_id', max(direct_message.id, get_newest_dm_id()))
 
 def check_DMs():
     """Check and handle any direct messages."""
-    for dm in [dm for dm in _get_all_DMs(lowest_id=get_newest_dm_id())]:
+    for dm in [dm for dm in _get_all_DMs(lowest_id=get_newest_dm_id()) if not seen_DM(dm.id)]:
         handle_dm(dm)
 
 def set_up():
@@ -552,8 +591,8 @@ if __name__ == '__main__':
     # That works out to needing to tweet on 5.57382532% of the script's invocations.
     if force_tweet or random.random() <= 0.0557382532:
         donnies_words = [][:]
-        for the_file in glob.glob('%s/*txt' % donnies_tweets_dir):
-            donnies_words += sg.word_list(the_file)
+        for the_file in _all_donnies_tweet_files():
+            donnies_words += sg.word_list_from_string(_get_tweet_archive_text(the_file))
         starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
         the_tweet = get_tweet(starts, the_mapping)
         tweet(the_tweet)
