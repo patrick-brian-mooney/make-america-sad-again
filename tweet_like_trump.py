@@ -137,7 +137,12 @@ def get_key_value_with_default(key_name, default=None):
 
 # This next group is a set of convenience functions that returns specific keys from the data store.
 def get_newest_tweet_id():
-    """Get the ID of the newest tweet that has been received and massaged."""
+    """Get the ID of the newest tweet that has been received and massaged. As a
+    special case, sets the value to -1, then returns -1, if there are no files
+    in the store of seen, postprocessed tweets.
+    """
+    if _num_tweet_files() == 0:
+        set_data_value('newest_tweet_id', -1)
     return get_key_value_with_default('newest_tweet_id', default=-1)
 
 def get_last_update_date():
