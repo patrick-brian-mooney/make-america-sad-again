@@ -377,10 +377,8 @@ def filter_tweet(tweet_text):
         return True  # At this time, the text generator doesn't deal well with input text containing URLs.
     elif '@' in tweet_text:  # Since more than one @mention can occur in a tweet ...
         mentions = list(set([w for w in tweet_text.split() if '@' in w]))  # Make a list of all unique @mentions
-        if len(
-                mentions) == 1:  # Allow The Donald to talk about himself (& not other people) without filtering those tweets out.
-            return not (th.strip_leading_and_trailing_punctuation(
-                mentions[0].strip()).strip().lower() == target_twitter_id.strip().lower())
+        if len(mentions) == 1:  # Allow The Donald to talk about himself (& not other people) without filtering those tweets out.
+            return not (th.strip_leading_and_trailing_punctuation(mentions[0].strip()).strip().lower() == target_twitter_id.strip().lower())
         else:  # Filter out tweets mentioning more than one person:
             return True  # by def'n, they're not just The Donald being self-aggrandizing.
     return False
@@ -390,33 +388,49 @@ def normalize(the_tweet):
     SUBSTITUTION_LIST (specified below). All substitutions are applied repeatedly,
     in the order they appear in the list, until none of them produces a change.
     HTML/XML entities are also unescaped, and any necessary other transformations
-    are applied (as of 14 Jan 2017, that's NONE for other transformations, but that
-    might change in the future.
+    are applied.
 
-    THE_TWEET is a Tweepy tweet object, not a string.
+    Currently, "other transformations" means:
+        * acronyms are (hopefully) detected, and their periods replaced with one-
+          dot leaders, so the Markov chain creator treats them as single words.
+
+    THE_TWEET is a Tweepy tweet object, not a string. (This routine currently
+    only deals with THE_TWEET.text, however).
+
+    SUBSTITUTION_LIST, below, is a list of two-item lists of the form
+        [[ search_item_1, replacement_item_1],
+         [ search_item_2, replacement_item_2],
+         [...]
+        ]
+
+    Each SEARCH_ITEM and REPLACE_ITEM is a regex passed to th.multi_replace();
+    see documentation for that function for more information.
     """
     substitution_list = [['\n', ' '],  # Newline to space
                          ['  ', ' '],  # Two spaces to one space
-                         ['U.S.A.', 'U․S․A․'],  # Periods to one-dot leaders
-                         ['U. S. A.', 'U․S․A․'],  # Periods to one-dot leaders, remove spaces
-                         ['U. S.', 'U․S․'],  # Periods to one-dot leaders, remove spaces
-                         ['U.S.', 'U․S․'],  # Periods to one-dot leaders
-                         ['P․M․', 'P․M․'],  # Again
-                         ['A․M․', 'A․M․'],  # Again
-                         ['V.P.', 'V․P․'],  # Again
-                         ['Mr.', 'Mr․'],  # Again
-                         ['Dr.', 'Dr․'],  # Again
-                         ['Mrs.', 'Mrs․'],  # Again
-                         ['Ms.', 'Ms․'],  # Again
-                         ['Rev.', 'Rev․'],  # Again
+                         ['U\.S\.A\.', 'U․S․A․'],  # Periods to one-dot leaders
+                         ['U\. S\. A\.', 'U․S․A․'],  # Periods to one-dot leaders, remove spaces
+                         ['U\. S\.', 'U․S․'],  # Periods to one-dot leaders, remove spaces
+                         ['U\.S\.', 'U․S․'],  # Periods to one-dot leaders
+                         ['P\.M\.', 'P․M․'],  # Again
+                         ['p\.m\.', 'p․m․'],  # Again
+                         ['A\.M\.', 'A․M․'],  # Again
+                         ['a\.m\.', 'a․m․'],  # Again
+                         ['V\.P\.', 'V․P․'],  # Again
+                         ['Mr\.', 'Mr․'],  # Again
+                         ['Dr\.', 'Dr․'],  # Again
+                         ['Mrs\.', 'Mrs․'],  # Again
+                         ['Ms\.', 'Ms․'],  # Again
+                         ['Rev\.', 'Rev․'],  # Again
                          [' \n', '\n'],  # Space-then-newline to newline
-                         ['....', '...'],  # Four periods to three periods
-                         ['...', '…'],  # Three periods to ellipsis
-                         ['….', '…'],   # Ellipsis-period to ellipsis. …. may be allowable, but is unlikely for Donnie.
+                         ['\.\.\.\.', '\.\.\.'],  # Four periods to three periods
+                         ['\.\.', '\.'],  # Two periods to one period
+                         ['\.\.\.', '…'],  # Three periods to ellipsis
+                         ['…\.', '…'],   # Ellipsis-period to ellipsis. …. may be allowable, but is unlikely for Donnie.
                          ['……', '…'],   # Double-ellipsis to ellipsis.
                          ['… …', '…'],  # Double-ellipsis-with-space to ellipsis
-                         ]
-    the_tweet.txt = sg.process_acronyms(the_tweet.text)
+                        ]
+    the_tweet.text = sg.process_acronyms(the_tweet.text)
     the_tweet.text = th.multi_replace(html.unescape(th.multi_replace(the_tweet.text, substitution_list)), substitution_list)
     return the_tweet
 
