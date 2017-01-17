@@ -218,6 +218,7 @@ def learn_all_DMs():
     DMs that have already been responded to just because some technical error on
     our end has caused the DM store to become unreadable.
     """
+    log_it("INFO: learn_all_DMs() called to recreate list")
     _store_id_set(DMs_store, {dm.id for dm in _get_all_DMs()})
 
 def learn_all_mentions():
@@ -225,6 +226,7 @@ def learn_all_mentions():
     set of @mentions we've ever seen. This only happens automatically under the
     same circumstances and for the same reasons as with learn_all_DMs(), above.
     """
+    log_it("INFO: learn_all_mentions() called to recreate list")
     _store_id_set(mentions_store, {m.id for m in _get_all_mentions()})
 
 def seen_DM(message_id):
@@ -265,15 +267,17 @@ def did_donnie_say_it(what):
             with open(which_file) as the_file:
                 ret = what.strip().lower() in ' '.join([ the_line.strip().lower() for the_line in the_file.readlines() ])
         return ret
-    except Exception:
+    except Exception as err:
+        log_it("WARNING: did_donnie_say_it() encountered error '%s'; assuming he didn't say it" % err, 2)
         return False
 
 def did_we_say_it(what):
     """Return True if we've previously tweeted WHAT, or False otherwise."""
     try:
         with open(tweets_store) as the_file:
-            return what.strip().lower() in ' '.join([ line.strip().lower() for line in the_file.readlines ])
-    except Exception:
+            return what.strip().lower() in ' '.join([ line.strip().lower() for line in the_file.readlines() ])
+    except Exception as err:
+        log_it("WARNING: did_we_say_it() encountered error '%s'; assuming we didn't say it" % err, 2)
         return False
 
 def validate_tweet(the_tweet):
@@ -407,6 +411,7 @@ def normalize(the_tweet):
                          ['……', '…'],   # Double-ellipsis to ellipsis.
                          ['… …', '…'],  # Double-ellipsis-with-space to ellipsis
                          ]
+    the_tweet.txt = sg.process_acronyms(the_tweet.text)
     the_tweet.text = th.multi_replace(html.unescape(th.multi_replace(the_tweet.text, substitution_list)), substitution_list)
     return the_tweet
 
@@ -427,8 +432,7 @@ def save_tweets(the_tweets):
         return
     with open('%s/%s.txt' % (donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w') as f:
         f.writelines(['%s\n' % tweet.text for tweet in the_tweets])
-    set_data_value('last_update_date',
-                   datetime.datetime.now())  # then, update the database of tweet-record filenames and ID numbers
+    set_data_value('last_update_date', datetime.datetime.now())  # then, update the database of tweet-record filenames and ID numbers
 
 def update_tweet_collection():
     """Update the tweet collection."""
