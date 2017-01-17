@@ -422,6 +422,7 @@ def normalize(the_tweet):
                          ['Mrs\.', 'Mrs․'],  # Again
                          ['Ms\.', 'Ms․'],  # Again
                          ['Rev\.', 'Rev․'],  # Again
+                         ['Sen\.', 'Sen․'],  # Again
                          [' \n', '\n'],  # Space-then-newline to newline
                          ['\.\.\.\.', '\.\.\.'],  # Four periods to three periods
                          ['\.\.', '\.'],  # Two periods to one period
@@ -464,8 +465,7 @@ def update_tweet_collection_if_necessary():
     """Once in a while, import new tweets encoding the brilliance that The Donald &
     his team have graced the world by sharing.
     """
-    if _num_tweet_files() == 0 or (
-        datetime.datetime.now() - get_last_update_date()).days > 30 or random.random() < 0.003 or force_download:
+    if _num_tweet_files() == 0 or (datetime.datetime.now() - get_last_update_date()).days > 30 or random.random() < 0.003 or force_download:
         update_tweet_collection()
 
 
