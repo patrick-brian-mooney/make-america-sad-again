@@ -194,7 +194,8 @@ def get_newest_mention_id():
 
 def get_newest_dm_id():
     """Returns the ID of the most recently seen DM."""
-    set_data_value('last_dm_id', max(max(_get_id_set(DMs_store)), get_key_value_with_default('last_dm_id')))
+    if get_key_value_with_default('last_dm_id') < max(_get_id_set(DMs_store)):
+        set_data_value('last_dm_id', max(_get_id_set(DMs_store)))
     return get_key_value_with_default('last_dm_id', default=-1)
 
 
@@ -349,7 +350,7 @@ def get_tweet(starts, the_mapping):
     while not got_tweet:
         sents = random.choice(range(1, 5))
         log_it("Generating a tweet (%d sentences) ..." % sents)
-        the_tweet = sg.gen_text(the_mapping, starts, markov_length=markov_length, sentences_desired=sents)
+        the_tweet = sg.gen_text(the_mapping, starts, markov_length=markov_length, sentences_desired=sents).strip()
         got_tweet = validate_tweet(the_tweet)
         log_it("length is %d" % len(the_tweet))
     return the_tweet
