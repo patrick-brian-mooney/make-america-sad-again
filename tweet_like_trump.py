@@ -36,10 +36,6 @@ patrick_logger.verbosity_level = 2  # As of 14 January 2017, 3 is the highest me
 
 markov_length = 2
 
-programmer_twitter_id = 'patrick_mooney'  # That's me, the author of this script: @patrick_mooney
-target_twitter_id = 'realDonaldTrump'  # That's the person whose tweets we're monitoring and imitating: @realDonaldTrump
-my_twitter_id = 'false_trump'  # That's the Twitter username under which the script posts: @false_trump
-
 def _get_new_API():
     """Get an instance of the Tweepy API object to work with."""
     auth = tweepy.OAuthHandler(Trump_client['consumer_key'], Trump_client['consumer_secret'])
@@ -123,7 +119,7 @@ def tweet(text, id=None, date=None):
 
 
 # This next group of functions handles the downloading, processing, and storing of The Donald's tweets.
-def get_new_tweets(screen_name=target_twitter_id, oldest=-1):
+def get_new_tweets(screen_name=tu.target_twitter_id, oldest=-1):
     """Get those tweets newer than the tweet whose ID is specified as the OLDEST
     parameter from the account SCREEN_NAME.
     """
@@ -161,7 +157,7 @@ def filter_tweet(tweet_text):
     elif '@' in tweet_text:  # Since more than one @mention can occur in a tweet ...
         mentions = list(set([w for w in tweet_text.split() if '@' in w]))  # Make a list of all unique @mentions
         if len(mentions) == 1:  # Allow The Donald to talk about himself (& not other people) without filtering those tweets out.
-            return not (th.strip_leading_and_trailing_punctuation(mentions[0].strip()).strip().lower() == target_twitter_id.strip().lower())
+            return not (th.strip_leading_and_trailing_punctuation(mentions[0].strip()).strip().lower() == tu.target_twitter_id.strip().lower())
         else:  # Filter out tweets mentioning more than one person:
             return True  # by def'n, they're not just The Donald being self-aggrandizing.
     return False
@@ -246,7 +242,7 @@ def save_tweets(the_tweets):
 def update_tweet_collection():
     """Update the tweet collection."""
     log_it("INFO: updating tweet collection")
-    t = get_new_tweets(screen_name=target_twitter_id, oldest=tu.get_newest_tweet_id())
+    t = get_new_tweets(screen_name=tu.target_twitter_id, oldest=tu.get_newest_tweet_id())
     t = massage_tweets(t)
     save_tweets(t)
 
@@ -281,13 +277,13 @@ def handle_mention(mention):
     log_it("INFO: Handling mention ID #%d" % mention.id)
     log_it("text is: %s" % mention.text)
     log_it("user is: @%s" % mention.user.screen_name)
-    if mention.user.screen_name.strip('@').lower() == programmer_twitter_id.strip('@').lower():
+    if mention.user.screen_name.strip('@').lower() == tu.programmer_twitter_id.strip('@').lower():
         tu.remember_id(tu.mentions_store, mention.id) # Force-learn it now: commands can force-terminate the script.
         tu.set_data_value('last_mention_id', max(mention.id, tu.get_newest_mention_id()))
-        process_command(mention.text, issuer_id=programmer_twitter_id)
-    elif mention.user.screen_name.strip('@').lower().strip() == target_twitter_id:
+        process_command(mention.text, issuer_id=tu.programmer_twitter_id)
+    elif mention.user.screen_name.strip('@').lower().strip() == tu.target_twitter_id:
         log_it("Oh my! The Donald is speaking! Click your jackboots together and salute!")
-        sm.modified_retweet('LOL\n\n', user_id=target_twitter_id, tweet_id=mention.id)
+        sm.modified_retweet('LOL\n\n', user_id=tu.target_twitter_id, tweet_id=mention.id)
     else:
         log_it('WARNING: unhandled mention from user @%s' % mention.user.screen_name)
         log_it("the tweet is: %s" % mention.text)
@@ -308,8 +304,8 @@ def handle_dm(direct_message):
     log_it("direct message is:\n\n%s" % pprint.pformat(direct_message), 3)
     log_it("text is: %s" % direct_message.text)
     log_it("user is: @%s" % direct_message.sender_screen_name)
-    if direct_message.sender_screen_name.lower().strip('@') == programmer_twitter_id.lower().strip('@'):
-        process_command(direct_message.text, issuer_id=programmer_twitter_id)
+    if direct_message.sender_screen_name.lower().strip('@') == tu.programmer_twitter_id.lower().strip('@'):
+        process_command(direct_message.text, issuer_id=tu.programmer_twitter_id)
     else:
         log_it("WARNING: unhandled DM detected:")
         log_it(pprint.pformat(direct_message))

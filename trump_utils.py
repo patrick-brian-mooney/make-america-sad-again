@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Shared constants and utilities for various scripts that handle the interactions
-with @false_trump and @realDonaldTrump.
+"""Shared constants and utilities for various scripts that handle interacting with
+the @false_trump account on Twitter, including those accessible to its
+web page.
 """
 
 
-import glob, datetime, pickle, csv
+import glob, datetime, pickle, csv, random
 
 import tweepy   							# https://github.com/tweepy/tweepy
 
-from social_media_auth import Trump_client	# That's an unshared file that contains my authentication constants for various social media platforms.
-
+from social_media_auth import Trump_client	# That's an unshared file that contains my authentication constants.
 import social_media as sm           		# https://github.com/patrick-brian-mooney/python-personal-library/blob/master/social_media.py
+
 import patrick_logger               		# https://github.com/patrick-brian-mooney/python-personal-library/blob/master/patrick_logger.py
 from patrick_logger import log_it
 
@@ -31,6 +32,10 @@ donnies_tweets_dir = "%s/donnies_tweets" % data_dir
 our_minimal_tweets = tweets_store                                                           # FIXME: this should in fact be a subset
 donnies_minimal_tweets = '/TrumpTweets/data/donnies_tweets/2017-01-17T12:51:46.978253.csv'  # FIXME: this should in fact be a subset
 
+programmer_twitter_id = 'patrick_mooney'  # That's me, the author of this script: @patrick_mooney
+target_twitter_id = 'realDonaldTrump'  # That's the person whose tweets we're monitoring and imitating: @realDonaldTrump
+my_twitter_id = 'false_trump'  # That's the Twitter username under which the script posts: @false_trump
+
 
 # Miscellaneous convenience functions
 def _num_tweet_files():
@@ -39,6 +44,11 @@ def _num_tweet_files():
     """
     return len(glob.glob('%s/*csv' % donnies_tweets_dir))
 
+def get_tweet_url(account, id):
+    """Given a tweet ID and the name of the associated ACCOUNT, generate a URL for
+    a tweet. 
+    """
+    return "https://twitter.com/%s/status/%s" % (account, id)
 
 # This group of functions is responsible for picking a tweet at random from a specified archive of tweets.
 def get_random_tweet(source_file):
@@ -47,7 +57,7 @@ def get_random_tweet(source_file):
     """
     with open(source_file, newline='') as the_archive:
         csvreader = csv.reader(the_archive)
-        return random.choice(list(csvreader))
+        return dict(zip(['text', 'id', 'date' ], random.choice(list(csvreader))))
 
 
 # This next group of functions handles storing and retrieving basic program operation parameters (persistent globals).
