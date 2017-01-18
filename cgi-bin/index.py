@@ -8,6 +8,8 @@ sys.stderr = sys.stdout
 
 import glob, random, re, cgi, csv, os
 from sentence_generator import *            # https://github.com/patrick-brian-mooney/markov-sentence-generator
+import tweet_like_trump as tt
+
 
 debugging = False
 
@@ -35,7 +37,7 @@ print("""<!doctype html>
 <meta name="description" content="Did Donald Trump say it on Twitter? Or was it a mindless robot that studies Donald Trump?" />
 <meta name="rating" content="general" />
 <meta name="revisit-after" content="3 days" />
-<meta name="date" content="2017-01-18T02:08:48-0800" />
+<meta name="date" content="2017-01-18T02:58:12-0800" />
 <meta property="fb:admins" content="100006098197123" />
 <meta property="og:title" content="Did Donnie Say It?" />
 <meta property="og:type" content="website" />
