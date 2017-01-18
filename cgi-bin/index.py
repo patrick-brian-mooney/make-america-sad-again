@@ -8,10 +8,10 @@ sys.stderr = sys.stdout
 
 import glob, random, re, cgi, csv, os
 from sentence_generator import *            # https://github.com/patrick-brian-mooney/markov-sentence-generator
-import tweet_like_trump as tt
+import trump_utils as tu
 
 
-debugging = False
+debugging = True
 
 
 print("""<!doctype html>
@@ -37,7 +37,7 @@ print("""<!doctype html>
 <meta name="description" content="Did Donald Trump say it on Twitter? Or was it a mindless robot that studies Donald Trump?" />
 <meta name="rating" content="general" />
 <meta name="revisit-after" content="3 days" />
-<meta name="date" content="2017-01-18T02:58:12-0800" />
+<meta name="date" content="2017-01-18T05:38:40-0800" />
 <meta property="fb:admins" content="100006098197123" />
 <meta property="og:title" content="Did Donnie Say It?" />
 <meta property="og:type" content="website" />
@@ -75,6 +75,10 @@ var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga
 
 </script>
 <h1>Did Donnie Say It?</h1>""")
+
+if debugging:
+    import pprint
+    print('<p><strong>%s</strong></p>' % pprint.pformat(tu._get_data_store()))
 
 # Parse any CGI parameters passed by a previous invocation, write appropriate results
 form = cgi.FieldStorage()

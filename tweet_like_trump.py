@@ -18,35 +18,27 @@ file LICENSE.md for details.
 
 import datetime, sys, pprint, glob, random, html, pickle, csv, tempfile, os
 
-import tweepy  # https://github.com/tweepy/tweepy
+import tweepy   # https://github.com/tweepy/tweepy
 
 from social_media_auth import Trump_client
 # That's an unshared file that contains my authentication constants for various social media platforms.
 
-import social_media as sm  # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/social_media.py
-import sentence_generator as sg  # https://github.com/patrick-brian-mooney/markov-sentence-generator
-import text_handling as th  # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/text_handling.py
-import patrick_logger  # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/patrick_logger.py
+import social_media as sm           # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/social_media.py
+import sentence_generator as sg     # https://github.com/patrick-brian-mooney/markov-sentence-generator
+import text_handling as th          # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/text_handling.py
+import patrick_logger               # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/patrick_logger.py
 from patrick_logger import log_it
 
-patrick_logger.verbosity_level = 2  # As of 14 January 2017, 3 is the highest meaningful level for this script
-force_download = False  # Set to True to always check for new tweets from Trump .
-force_tweet = True  # Skip the dice roll; definitely post a new tweet every time the script is run.
+import trump_utils as tu
 
-base_dir = '/TrumpTweets'
-data_dir = '%s/data' % base_dir
-data_store = '%s/TrumpTweets_data.pkl' % data_dir
-tweets_store = "%s/our_tweets.csv" % data_dir
-DMs_store = '%s/seen_DMs.pkl' % data_dir
-mentions_store = '%s/seen_mentions.pkl' % data_dir
-donnies_tweets_dir = "%s/donnies_tweets" % data_dir
+
+patrick_logger.verbosity_level = 2  # As of 14 January 2017, 3 is the highest meaningful level for this script
 
 markov_length = 2
 
 programmer_twitter_id = 'patrick_mooney'  # That's me, the author of this script: @patrick_mooney
 target_twitter_id = 'realDonaldTrump'  # That's the person whose tweets we're monitoring and imitating: @realDonaldTrump
 my_twitter_id = 'false_trump'  # That's the Twitter username under which the script posts: @false_trump
-
 
 def _get_new_API():
     """Get an instance of the Tweepy API object to work with."""
@@ -59,252 +51,13 @@ def _get_new_API():
 the_API = _get_new_API()
 
 
-# Miscellaneous convenience functions
-def _num_tweet_files():
-    """Convenience function to return the number of files in which The Donald's
-    tweets are stored.
-    """
-    return len(glob.glob('%s/*csv' % donnies_tweets_dir))
-
-
-# This next group of functions handles storing and retrieving basic program operation parameters (persistent globals).
-# This is actually an inefficient way to do this, but it'll work for the simple tasks this script needs.
-# Note that lists of already-processed DMs and @mentions are stored using a similar but separate mechanism.
-def _get_data_store():
-    """Private function to get the entire stored data dictionary. If the data
-    storage dictionary cannot be read, create a new dictionary with default
-    values.
-    """
-    try:
-        with open(data_store, 'rb') as the_data_file:
-            return pickle.load(the_data_file)
-    except Exception:
-        log_it('WARNING: Data store does not exist or cannot be read, creating ...')
-        the_data = {'purpose': 'data store for the TrumpTweets project at @false_trump',
-                    'program author': 'Patrick Mooney',
-                    'script URL': 'https://github.com/patrick-brian-mooney/make-america-sad-again',
-                    'author twitter ID': '@patrick_mooney',
-                    }
-        with open(data_store, 'wb') as the_data_file:
-            pickle.dump(the_data, the_data_file)
-        return the_data
-
-def set_data_value(keyname, value):
-    """Store a VALUE, by KEYNAME, in the persistent data store. This data store is
-    read from disk, modified, and immediately written back to disk. This is a
-    naive function that doesn't worry about multiple simultaneous attempts to
-    access the store: there should never be any. (This script should be the only
-    process accessing the file, and there should only be one invocation running
-    at a time.
-    """
-    the_data = _get_data_store()
-    the_data[keyname] = value
-    with open(data_store, 'wb') as the_data_file:
-        pickle.dump(the_data, the_data_file)
-
-def get_data_value(keyname):
-    """Retrieves a configuration variable from the data_store file, which is not
-    meant to be easily user-editable. If the KEYNAME is not in the data store,
-    adds a KEYNAME entry with value None and returns None. If it modifies the data
-    store in this way, it then writes the data store back to disk.
-    """
-    try:
-        return _get_data_store()[keyname]
-    except KeyError:
-        log_it('WARNING: attempted to get undefined data key "%s"; initializing to None' % keyname)
-        set_data_value(keyname, None)
-        return None
-
-def get_key_value_with_default(key_name, default=None):
-    """Try to get a key value from the data store. If that fails, return the
-    default value, instead, and create that key in the data store with the
-    specified default value.
-    """
-    try:
-        ret = get_data_value(key_name)
-        if ret == None and default is not None:  # If necessary, set the default value.
-            set_data_value(key_name, default)
-            ret = default
-        return ret
-    except Exception as err:
-        log_it('WARNING: get_key_value_with_default() encountered exception "%s"; returning default value "%s"' % (err, default), 1)
-        return default
-
-
-# This next group of functions deals with stored tweet files.
-# These files are .csv files with three columns. Each row has the structure:
-#       [ tweet text, tweet ID, tweet date ]
-def _all_donnies_tweet_files():
-    """Convenience function to return a list of all files The Donald's tweets are
-    stored in.
-
-    :return: a list of these files.
-    """
-    return glob.glob("%s/*csv" % donnies_tweets_dir)
-
-def _get_tweet_archive_text(archive_file):
-    """Returns the full text, and nothing but the text, of all tweets stored in
-    a tweet archive .csv file, which stores the text of the tweets in the first
-    column of the file.
-
-    :return: a string containing the archive of all of our tweets.
-    """
-    with open(tweets_store, newline='') as csvfile:
-        csvreader = csv.reader(csvfile)
-        return '\n'.join([row[0] for row in csvreader])
-
-def get_our_tweet_text():
-    """ Returns the full text of all tweets this script has created and stored.
-
-    :return: a string containing the archive of all of our tweets.
-    """
-    return _get_tweet_archive_text(tweets_store)
-
-def get_donnies_tweet_text():
-    """Returns the full text of all of The Donald's tweets that this script is
-    aware of.
-
-    :return: a string containing the text of all such tweets.
-    """
-    ret = ""
-    for which_file in _all_donnies_tweet_files():
-        ret += _get_tweet_archive_text(which_file)
-    return ret
-
-
-# This next group is a set of convenience functions that returns specific keys from the data store.
-def get_newest_tweet_id():
-    """Get the ID of the newest tweet that has been received and massaged. As a
-    special case, sets the value to -1, then returns -1, if there are no files
-    in the store of seen, postprocessed tweets.
-    """
-    if _num_tweet_files() == 0:
-        set_data_value('newest_tweet_id', -1)
-    return get_key_value_with_default('newest_tweet_id', default=-1)
-
-def get_last_update_date():
-    """Get the last time that the database was updated."""
-    return get_key_value_with_default('last_update_date', default=datetime.datetime.min)
-
-def get_newest_mention_id():
-    """Return the ID of the most recent @mention the program is aware of and has
-    dealt with.
-    """
-    return get_key_value_with_default('last_mention_id', default=-1)
-
-def get_newest_dm_id():
-    """Returns the ID of the most recently seen DM."""
-    if get_key_value_with_default('last_dm_id') < max(_get_id_set(DMs_store)):
-        set_data_value('last_dm_id', max(_get_id_set(DMs_store)))
-    return get_key_value_with_default('last_dm_id', default=-1)
-
-
-# This next group of functions handles remembering DMs and @mentions that have been seen (and dealt with) previously.
-def _get_id_set(which_store):
-    """Unpickles and returns a set of ID numbers stored in the file WHICH_STORE.
-    Errors in this routine should be caught by the calling function.
-    """
-    with open(which_store, 'rb') as msg_file:
-        return pickle.load(msg_file)
-
-def _store_id_set(which_store, the_set):
-    """Stuff the set of seen-message IDs back into the file WHICH_STORE."""
-    with open(which_store, 'wb') as msg_file:
-        pickle.dump(the_set, msg_file)
-
-def remember_id(which_store, id_num):
-    """Add ID_NUM to the set of ID numbers of seen messages stored in WHICH_STORE."""
-    the_set = _get_id_set(which_store)
-    the_set |= {id_num}
-    _store_id_set(which_store, the_set)
-
-def seen_message(message_store, message_id):
-    """Return True if the id MESSAGE_ID is in the MESSAGE_STORE data set, or
-    False otherwise. Each MESSAGE_STORE file is a pickled set of IDs of messages
-    already seen by the script.
-    """
-    try:
-        return message_id in _get_id_set(message_store)
-    except Exception:  # If we can't verify we haven't seen it, ignore it. Don't bother people due to technical errors on our end.
-        log_it("WARNING: data store '%s' doesn't exist or is unreadable; creating empty store ... " % message_store, 2)
-        with open(message_store, 'wb') as msg_file:
-            pickle.dump(msg_file, set([]))
-        return None  # signal that something went wrong, and calling function will have to deal with it.
-
-def _get_all_messages(source):
-    """Get the set of all messages from the specified SOURCE, ever (or, at least as
-    far back as the Twitter API will let us go).
-    """
-    ret = [][:]
-    got_some = False
-    while not ret and not got_some:
-        new_msgs = [m for m in source()]
-        got_some = True
-        for item in new_msgs:
-            if item not in ret:
-                ret += [item]
-    return ret
-
-def _get_all_DMs(lowest_id=-1):
-    """Get a list of all DMs, ever; or, all DMs after the optional
-    LOWEST_ID parameter.
-    """
-    return [dm for dm in _get_all_messages(lambda: the_API.direct_messages(count=100, full_text=True, since_id=lowest_id))]
-
-def _get_all_mentions():
-    """Get a list of all @mentions, ever."""
-    return [m for m in _get_all_messages(lambda: the_API.mentions_timeline(count=100))]
-
-def learn_all_DMs():
-    """Get a list of all the DMs that have ever been sent, and add them to the list
-    of DMs we've ever seen. This only happens automatically if the DM store is
-    recreated, on the theory that we shouldn't bother people by responding to
-    DMs that have already been responded to just because some technical error on
-    our end has caused the DM store to become unreadable.
-    """
-    log_it("INFO: learn_all_DMs() called to recreate list")
-    _store_id_set(DMs_store, {dm.id for dm in _get_all_DMs()})
-
-def learn_all_mentions():
-    """Get a list of all @mentions that have ever been sent, and add them to the
-    set of @mentions we've ever seen. This only happens automatically under the
-    same circumstances and for the same reasons as with learn_all_DMs(), above.
-    """
-    log_it("INFO: learn_all_mentions() called to recreate list")
-    _store_id_set(mentions_store, {m.id for m in _get_all_mentions()})
-
-def seen_DM(message_id):
-    """Return True if the DM has been seen before, False otherwise. If the data store
-    of seen DMs does not exist, it's created, and all DMs ever sent are treated
-    as seen.
-    """
-    ret = seen_message(DMs_store, message_id)
-    if ret is None:
-        learn_all_DMs()
-        ret = True
-    return ret
-
-def seen_mention(message_id):
-    """Return True if we have seen and processed the @mention before, or False if
-    it's new to us. If the data store of seen @mentions does not exist, it's
-    created, and all @mentions ever sent are remembered and assumed to have
-    been processed already: we don't want to bother people by interacting with
-    them again for a @mention we've already responded to.
-    """
-    ret = seen_message(mentions_store, message_id)
-    if ret is None:
-        learn_all_mentions()
-        ret = True
-    return ret
-
-
 # This next group of functions handles the actual creation of tweets based on our stored copies of The Donald's tweets
 def did_donnie_say_it(what):
     """Return True if WHAT has appeared in the Trump tweets we know about, or
     False otherwise.
     """
     try:
-        return (what.strip().lower() in get_donnies_tweet_text().strip().lower())
+        return (what.strip().lower() in tu.get_donnies_tweet_text().strip().lower())
     except Exception as err:
         log_it("WARNING: did_donnie_say_it() encountered error '%s'; assuming he didn't say it" % err, 2)
         return False
@@ -312,7 +65,7 @@ def did_donnie_say_it(what):
 def did_we_say_it(what):
     """Return True if we've previously tweeted WHAT, or False otherwise."""
     try:
-        return (what.strip().lower() in get_our_tweet_text().strip().lower())
+        return (what.strip().lower() in tu.get_our_tweet_text().strip().lower())
     except Exception as err:
         log_it("WARNING: did_we_say_it() encountered error '%s'; assuming we didn't say it" % err, 2)
         return False
@@ -363,10 +116,10 @@ def tweet(text, id=None, date=None):
     the_status = sm.post_tweet(Trump_client, text)
 
     log_it("Adding that tweet to our tweet archive")
-    with open(tweets_store, mode='a', newline='') as archive_file:
+    with open(tu.tweets_store, mode='a', newline='') as archive_file:
         writer = csv.writer(archive_file)
         writer.writerow([the_status.text, the_status.id, str(the_status.created_at)])
-    the_lines = get_donnies_tweet_text().split('\n')
+    the_lines = tu.get_donnies_tweet_text().split('\n')
 
 
 # This next group of functions handles the downloading, processing, and storing of The Donald's tweets.
@@ -387,7 +140,7 @@ def get_new_tweets(screen_name=target_twitter_id, oldest=-1):
         ret.extend(new_tweets)
         oldest_tweet = ret[-1].id - 1
         log_it("    ...%s tweets downloaded so far" % (len(ret)))
-    set_data_value('newest_tweet_id', max([t.id for t in ret]))
+    tu.set_data_value('newest_tweet_id', max([t.id for t in ret]))
     return [t for t in ret if (t.id > oldest)]
 
 def filter_tweet(tweet_text):
@@ -479,21 +232,21 @@ def save_tweets(the_tweets):
     """Save the text from THE_TWEETS to a CSV file, and update the stored data.
     THE_TWEETS is a list of tweepy.Tweet objects, not strings.
 
-    See the function get_our_tweet_text(), above, for a declaration of the format
-    of the .csv file.
+    See the function get_our_tweet_text() in trump_utils.py for a declaration of
+    the format of the .csv file.
     """
     if len(the_tweets) == 0:  # If there are no new tweets, don't do anything
         return
-    with open('%s/%s.csv' % (donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w', newline="") as f:
+    with open('%s/%s.csv' % (tu.donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w', newline="") as f:
         csvwriter = csv.writer(f)
         for t in the_tweets:
             csvwriter.writerow([t.text, t.id_str, t.created_at])
-    set_data_value('last_update_date', datetime.datetime.now())  # then, update the database of tweet-record filenames and ID numbers
+    tu.set_data_value('last_update_date', datetime.datetime.now())  # then, update the database of tweet-record filenames and ID numbers
 
 def update_tweet_collection():
     """Update the tweet collection."""
     log_it("INFO: updating tweet collection")
-    t = get_new_tweets(screen_name=target_twitter_id, oldest=get_newest_tweet_id())
+    t = get_new_tweets(screen_name=target_twitter_id, oldest=tu.get_newest_tweet_id())
     t = massage_tweets(t)
     save_tweets(t)
 
@@ -501,7 +254,7 @@ def update_tweet_collection_if_necessary():
     """Once in a while, import new tweets encoding the brilliance that The Donald &
     his team have graced the world by sharing.
     """
-    if _num_tweet_files() == 0 or (datetime.datetime.now() - get_last_update_date()).days > 30 or random.random() < 0.003 or force_download:
+    if tu.force_download or tu._num_tweet_files() == 0 or (datetime.datetime.now()-tu.get_last_update_date()).days > 30 or random.random() < 0.003:
         update_tweet_collection()
 
 
@@ -510,12 +263,12 @@ def process_command(command, issuer_id):
     """Process a command coming from my own Twitter account."""
     command_parts = [c.strip().lower() for c in command.strip().split() if not c.strip().startswith('@')]
     if command_parts[0] in ['stop', 'quiet', 'silence']:
-        set_data_value('stopped', True)
+        tu.set_data_value('stopped', True)
         sm.send_DM(the_API=the_API, text='You got it, sir, halting tweets per your command.', user=issuer_id)
         log_it('INFO: aborting run because command "%s" was issued.' % command_parts[0])
         sys.exit(0)
     elif command_parts[0] in ['start', 'verbose', 'go', 'loud', 'begin']:
-        set_data_value('stopped', False)
+        tu.set_data_value('stopped', False)
         sm.send_DM(the_API=the_API, text='Yessir, beginning tweeting again per your command.', user=issuer_id)
     elif command_parts[0] in ['update', 'refresh', 'check', 'reload', 'new']:
         update_tweet_collection()
@@ -529,8 +282,8 @@ def handle_mention(mention):
     log_it("text is: %s" % mention.text)
     log_it("user is: @%s" % mention.user.screen_name)
     if mention.user.screen_name.strip('@').lower() == programmer_twitter_id.strip('@').lower():
-        remember_id(mentions_store, mention.id) # Force-learn it now: commands can force-terminate the script.
-        set_data_value('last_mention_id', max(mention.id, get_newest_mention_id()))
+        tu.remember_id(tu.mentions_store, mention.id) # Force-learn it now: commands can force-terminate the script.
+        tu.set_data_value('last_mention_id', max(mention.id, tu.get_newest_mention_id()))
         process_command(mention.text, issuer_id=programmer_twitter_id)
     elif mention.user.screen_name.strip('@').lower().strip() == target_twitter_id:
         log_it("Oh my! The Donald is speaking! Click your jackboots together and salute!")
@@ -538,12 +291,12 @@ def handle_mention(mention):
     else:
         log_it('WARNING: unhandled mention from user @%s' % mention.user.screen_name)
         log_it("the tweet is: %s" % mention.text)
-    remember_id(mentions_store, mention.id)
-    set_data_value('last_mention_id', max(mention.id, get_newest_mention_id()))
+    tu.remember_id(tu.mentions_store, mention.id)
+    tu.set_data_value('last_mention_id', max(mention.id, tu.get_newest_mention_id()))
 
 def check_mentions():
     """A stub to check for any @mentions and, if necessary, reply to them."""
-    for mention in [m for m in _get_all_mentions() if m.id > get_newest_mention_id()]:
+    for mention in [m for m in tu._get_all_mentions(the_API=the_API) if m.id > tu.get_newest_mention_id()]:
         handle_mention(mention)
 
 def handle_dm(direct_message):
@@ -561,15 +314,13 @@ def handle_dm(direct_message):
         log_it("WARNING: unhandled DM detected:")
         log_it(pprint.pformat(direct_message))
         log_it("Replying with default message")
-        sm.send_DM(the_API=the_API,
-                   text="Sorry, I'm a bot and don't process direct messages. If you need to reach my human minder, he's @patrick_mooney.",
-                   user=direct_message.sender_screen_name)
-    remember_id(DMs_store, direct_message.id)
-    set_data_value('last_dm_id', max(direct_message.id, get_newest_dm_id()))
+        sm.send_DM(the_API=the_API, text="Sorry, I'm a bot and don't process direct messages. If you need to reach my human minder, he's @patrick_mooney.", user=direct_message.sender_screen_name)
+    tu.remember_id(tu.DMs_store, direct_message.id)
+    tu.set_data_value('last_dm_id', max(direct_message.id, tu.get_newest_dm_id()))
 
 def check_DMs():
     """Check and handle any direct messages."""
-    for dm in [dm for dm in _get_all_DMs(lowest_id=get_newest_dm_id()) if not seen_DM(dm.id)]:
+    for dm in [dm for dm in tu._get_all_DMs(lowest_id=tu.get_newest_dm_id(), the_API=the_API) if not tu.seen_DM(dm.id)]:
         handle_dm(dm)
 
 def set_up():
@@ -583,17 +334,17 @@ def set_up():
 
 if __name__ == '__main__':
     set_up()
-    if get_data_value('stopped'):
+    if tu.get_data_value('stopped'):
         log_it('Aborting: user data key "stopped" is set.')
         sys.exit(0)
 
     # @realDonaldTrump tweeted 200 times between 12/04/16 03:48 AM & 01/10/17 12:51 PM; that's approx. 5.3 tweets/day.
     # If this script is called every fifteen minutes by a cron job, that's 96 times/day
     # That works out to needing to tweet on 5.57382532% of the script's invocations.
-    if force_tweet or random.random() <= 0.0557382532:
+    if tu.force_tweet or random.random() <= 0.0557382532:
         donnies_words = [][:]
-        for the_file in _all_donnies_tweet_files():
-            donnies_words += sg.word_list_from_string(_get_tweet_archive_text(the_file))
+        for the_file in tu._all_donnies_tweet_files():
+            donnies_words += sg.word_list_from_string(tu._get_tweet_archive_text(the_file))
         starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
         the_tweet = get_tweet(starts, the_mapping)
         tweet(the_tweet)
