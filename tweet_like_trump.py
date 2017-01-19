@@ -16,7 +16,7 @@ under the GPL, either version 3 or (at your option) any later version. See the
 file LICENSE.md for details.
 """
 
-import datetime, sys, pprint, glob, random, html, pickle, csv, tempfile, os
+import datetime, sys, pprint, random, html, csv
 
 import tweepy   # https://github.com/tweepy/tweepy
 
