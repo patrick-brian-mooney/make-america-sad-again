@@ -6,22 +6,20 @@ web page.
 """
 
 
-import glob, datetime, pickle, csv, random
+import glob, datetime, pickle, csv, random, os
 
-import tweepy   							# https://github.com/tweepy/tweepy
-
-from social_media_auth import Trump_client	# That's an unshared file that contains my authentication constants.
-import social_media as sm           		# https://github.com/patrick-brian-mooney/python-personal-library/blob/master/social_media.py
-
-import patrick_logger               		# https://github.com/patrick-brian-mooney/python-personal-library/blob/master/patrick_logger.py
-from patrick_logger import log_it
+try:
+    from patrick_logger import log_it   # Don't fail if running on a webserver
+except ImportError:
+    def log_it(message, minimum_detail_level):
+        print(message)
 
 
 
 force_download = False      # Set to True to always check for new tweets from Trump .
 force_tweet = True          # Skip the dice roll; definitely post a new tweet every time the script is run.
 
-base_dir = '/TrumpTweets'
+base_dir = '/TrumpTweets'    # FIXME: that's an ugly hack
 data_dir = '%s/data' % base_dir
 data_store = '%s/TrumpTweets_data.pkl' % data_dir
 tweets_store = "%s/our_tweets.csv" % data_dir
