@@ -10,7 +10,7 @@ import glob, random, re, cgi, csv, os
 import trump_utils as tu
 
 # Overwrite some values from trump_utils.py with web server locations.
-tu.base_dir = '/~patrick/projects/TrumpQuiz' # '/home/public/~patrick/projects/TrumpQuiz'
+tu.base_dir = '/home/public/~patrick/projects/TrumpQuiz' # '/~patrick/projects/TrumpQuiz'
 tu.data_dir = tu.base_dir
 tu.data_store = '%s/TrumpTweets_data.pkl' % tu.data_dir
 tu.tweets_store = ""
@@ -20,7 +20,7 @@ tu.donnies_tweets_dir = ""
 tu.our_minimal_tweets = "%s/false_trump.csv" % tu.data_dir
 tu.donnies_minimal_tweets = "%s/trump.csv" % tu.data_dir
 
-debugging = True
+debugging = False
 
 
 print("""<!doctype html>
@@ -46,7 +46,7 @@ print("""<!doctype html>
 <meta name="description" content="Did Donald Trump say it on Twitter? Or was it a mindless robot that studies Donald Trump?" />
 <meta name="rating" content="general" />
 <meta name="revisit-after" content="3 days" />
-<meta name="date" content="2017-01-19T02:54:08-0800" />
+<meta name="date" content="2017-01-19T03:15:28-0800" />
 <meta property="fb:admins" content="100006098197123" />
 <meta property="og:title" content="Did Donnie Say It?" />
 <meta property="og:type" content="website" />
