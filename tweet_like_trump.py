@@ -71,7 +71,7 @@ def get_newest_mention_id():
 def get_newest_dm_id():
     """Returns the ID of the most recently seen DM."""
     if tm.get_key_value_with_default('last_dm_id', default=-1) < max(tm._get_id_set(tu.DMs_store)):
-        tm.set_data_value('last_dm_id', max(tm._get_id_set(DMs_store)))
+        tm.set_data_value('last_dm_id', max(tm._get_id_set(tu.DMs_store)))
     return tm.get_key_value_with_default('last_dm_id', default=-1)
 
 
@@ -290,8 +290,6 @@ def process_command(command, issuer_id):
     if command_parts[0] in ['stop', 'quiet', 'silence']:
         tm.set_data_value('stopped', True)
         sm.send_DM(the_API=the_API, text='You got it, sir, halting tweets per your command.', user=issuer_id)
-        log_it('INFO: aborting run because command "%s" was issued.' % command_parts[0])
-        sys.exit(0)
     elif command_parts[0] in ['start', 'verbose', 'go', 'loud', 'begin']:
         tm.set_data_value('stopped', False)
         sm.send_DM(the_API=the_API, text='Yessir, beginning tweeting again per your command.', user=issuer_id)

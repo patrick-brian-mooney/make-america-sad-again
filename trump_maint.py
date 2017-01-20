@@ -164,7 +164,7 @@ def seen_DM(message_id):
     of seen DMs does not exist, it's created, and all DMs ever sent are treated
     as seen.
     """
-    ret = seen_message(DMs_store, message_id)
+    ret = seen_message(tu.DMs_store, message_id)
     if ret is None:
         learn_all_DMs()
         ret = True
@@ -236,8 +236,8 @@ def plaintext_export(filename, getter):
 def export_plaintext_tweets():
     """Produce plaintext versions of the tweet stores, so they 
     """
-    plaintext_export(donnie_plaintext_tweets, get_donnies_tweet_text)
-    plaintext_export(our_plaintext_tweets, get_our_tweet_text)    
+    plaintext_export(tu.donnie_plaintext_tweets, get_donnies_tweet_text)
+    plaintext_export(tu.our_plaintext_tweets, get_our_tweet_text)    
 
 if __name__ == "__main__":
     pass
