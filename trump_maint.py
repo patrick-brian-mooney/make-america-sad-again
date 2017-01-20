@@ -203,7 +203,7 @@ def get_our_tweet_text():
 
     :return: a string containing the archive of all of our tweets.
     """
-    return _get_tweet_archive_text(tweets_store)
+    return _get_tweet_archive_text(tu.tweets_store)
 
 def get_donnies_tweet_text():
     """Returns the full text of all of The Donald's tweets that this script is
