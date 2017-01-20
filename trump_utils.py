@@ -19,7 +19,7 @@ except ImportError:
 force_download = False      # Set to True to always check for new tweets from Trump .
 force_tweet = True          # Skip the dice roll; definitely post a new tweet every time the script runs.
 
-base_dir = '/TrumpTweets'    # FIXME: that's an ugly hack
+base_dir = '/TrumpTweets'
 data_dir = '%s/data' % base_dir
 data_store = '%s/TrumpTweets_data.pkl' % data_dir
 tweets_store = "%s/our_tweets.csv" % data_dir
@@ -29,6 +29,9 @@ donnies_tweets_dir = "%s/donnies_tweets" % data_dir
 
 our_minimal_tweets = tweets_store                                                           # FIXME: this should in fact be a subset
 donnies_minimal_tweets = '/TrumpTweets/data/donnies_tweets/2017-01-19T17:45:19.991927.csv'  # FIXME: this should in fact be a subset
+
+donnie_plaintext_tweets = '%s/donnie_plaintext_tweets.txt' % data_dir 
+our_plaintext_tweets = '%s/our_plaintext_tweets.txt' % data_dir 
 
 programmer_twitter_id = 'patrick_mooney'  # That's me, the author of this script: @patrick_mooney
 target_twitter_id = 'realDonaldTrump'  # That's the person whose tweets we're monitoring and imitating: @realDonaldTrump
@@ -162,6 +165,22 @@ def get_donnies_tweet_text():
         ret += _get_tweet_archive_text(which_file)
     return ret
 
+
+# These next two utility functions handle exporting text-only versions of the tweet archive files for consumption by other applications.
+# For instance, starting 20 Jan 2017, they will be a component of my *Ulysses Redux* blog, under the title "Donnie #Stomps thru Dublin"
+def plaintext_export(filename, getter):
+    """Export all of The Donald's stored tweets into a single plaintext file to be
+    consumed by other applications.
+    """
+    with open(filename, 'w') as export_file:
+        export_file.write(getter())
+
+def export_plaintext_tweets():
+    """
+    """
+    plaintext_export(donnie_plaintext_tweets, get_donnies_tweet_text)
+    plaintext_export(our_plaintext_tweets, get_our_tweet_text)
+    
 
 # This next group is a set of convenience functions that returns specific keys from the data store.
 def get_newest_tweet_id():

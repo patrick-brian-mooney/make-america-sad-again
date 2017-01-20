@@ -245,6 +245,7 @@ def update_tweet_collection():
     t = get_new_tweets(screen_name=tu.target_twitter_id, oldest=tu.get_newest_tweet_id())
     t = massage_tweets(t)
     save_tweets(t)
+    tu.export_plaintext_tweets()    # Make sure that an up-to-date export is there for applications that consume it.
 
 def update_tweet_collection_if_necessary():
     """Once in a while, import new tweets encoding the brilliance that The Donald &
