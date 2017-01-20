@@ -186,30 +186,30 @@ def normalize(the_tweet):
     Each SEARCH_ITEM and REPLACE_ITEM is a regex passed to th.multi_replace();
     see documentation for that function for more information.
     """
-    substitution_list = [['\n', ' '],  # Newline to space
-                         ['  ', ' '],  # Two spaces to one space
-                         ['U\.S\.A\.', 'U․S․A․'],  # Periods to one-dot leaders
-                         ['U\. S\. A\.', 'U․S․A․'],  # Periods to one-dot leaders, remove spaces
-                         ['U\. S\.', 'U․S․'],  # Periods to one-dot leaders, remove spaces
-                         ['U\.S\.', 'U․S․'],  # Periods to one-dot leaders
-                         ['P\.M\.', 'P․M․'],  # Again
-                         ['p\.m\.', 'p․m․'],  # Again
-                         ['A\.M\.', 'A․M․'],  # Again
-                         ['a\.m\.', 'a․m․'],  # Again
-                         ['V\.P\.', 'V․P․'],  # Again
-                         ['Mr\.', 'Mr․'],  # Again
-                         ['Dr\.', 'Dr․'],  # Again
-                         ['Mrs\.', 'Mrs․'],  # Again
-                         ['Ms\.', 'Ms․'],  # Again
-                         ['Rev\.', 'Rev․'],  # Again
-                         ['Sen\.', 'Sen․'],  # Again
-                         [' \n', '\n'],  # Space-then-newline to newline
-                         ['\.\.\.\.', '\.\.\.'],  # Four periods to three periods
-                         ['\.\.', '\.'],  # Two periods to one period
-                         ['\.\.\.', '…'],  # Three periods to ellipsis
-                         ['…\.', '…'],  # Ellipsis-period to ellipsis. …. may be allowable, but is unlikely for Donnie.
-                         ['……', '…'],  # Double-ellipsis to ellipsis.
-                         ['… …', '…'],  # Double-ellipsis-with-space to ellipsis
+    substitution_list = [['\n', ' '],                   # Newline to space
+                         ['  ', ' '],                   # Two spaces to one space
+                         ['U\.S\.A\.', 'U․S․A․'],       # Periods to one-dot leaders
+                         ['U\. S\. A\.', 'U․S․A․'],     # Periods to one-dot leaders, remove spaces
+                         ['U\. S\.', 'U․S․'],           # Periods to one-dot leaders, remove spaces
+                         ['U\.S\.', 'U․S․'],            # Periods to one-dot leaders
+                         ['P\.M\.', 'P․M․'],            # Again
+                         ['p\.m\.', 'p․m․'],            # Again
+                         ['A\.M\.', 'A․M․'],            # Again
+                         ['a\.m\.', 'a․m․'],            # Again
+                         ['V\.P\.', 'V․P․'],            # Again
+                         ['Mr\.', 'Mr․'],               # Again
+                         ['Dr\.', 'Dr․'],               # Again
+                         ['Mrs\.', 'Mrs․'],             # Again
+                         ['Ms\.', 'Ms․'],               # Again
+                         ['Rev\.', 'Rev․'],             # Again
+                         ['Sen\.', 'Sen․'],             # Again
+                         [' \n', '\n'],                 # Space-then-newline to newline
+                         ['\.\.\.\.', '...'],               # Four periods to three periods
+                         ['\.\.', '.'],                   # Two periods to one period
+                         ['\.\.\.', '…'],                  # Three periods to ellipsis
+                         ['…\.', '…'],                   # Ellipsis-period to ellipsis. …. may be allowable, but is unlikely for Donnie.
+                         ['……', '…'],                   # Double-ellipsis to ellipsis.
+                         ['… …', '…'],                  # Double-ellipsis-with-space to ellipsis
                         ]
     the_tweet.text = sg.process_acronyms(the_tweet.text)
     the_tweet.text = th.multi_replace(html.unescape(th.multi_replace(the_tweet.text, substitution_list)),substitution_list)

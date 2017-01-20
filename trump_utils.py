@@ -17,7 +17,7 @@ except ImportError:
 
 
 force_download = False      # Set to True to always check for new tweets from Trump .
-force_tweet = True          # Skip the dice roll; definitely post a new tweet every time the script is run.
+force_tweet = True          # Skip the dice roll; definitely post a new tweet every time the script runs.
 
 base_dir = '/TrumpTweets'    # FIXME: that's an ugly hack
 data_dir = '%s/data' % base_dir
@@ -28,7 +28,7 @@ mentions_store = '%s/seen_mentions.pkl' % data_dir
 donnies_tweets_dir = "%s/donnies_tweets" % data_dir
 
 our_minimal_tweets = tweets_store                                                           # FIXME: this should in fact be a subset
-donnies_minimal_tweets = '/TrumpTweets/data/donnies_tweets/2017-01-17T12:51:46.978253.csv'  # FIXME: this should in fact be a subset
+donnies_minimal_tweets = '/TrumpTweets/data/donnies_tweets/2017-01-19T17:45:19.991927.csv'  # FIXME: this should in fact be a subset
 
 programmer_twitter_id = 'patrick_mooney'  # That's me, the author of this script: @patrick_mooney
 target_twitter_id = 'realDonaldTrump'  # That's the person whose tweets we're monitoring and imitating: @realDonaldTrump
@@ -44,7 +44,7 @@ def _num_tweet_files():
 
 def get_tweet_url(account, id):
     """Given a tweet ID and the name of the associated ACCOUNT, generate a URL for
-    a tweet. 
+    a tweet.
     """
     return "https://twitter.com/%s/status/%s" % (account, id)
 
@@ -140,7 +140,7 @@ def _get_tweet_archive_text(archive_file):
 
     :return: a string containing the archive of all of our tweets.
     """
-    with open(tweets_store, newline='') as csvfile:
+    with open(archive_file, newline='') as csvfile:
         csvreader = csv.reader(csvfile)
         return '\n'.join([row[0] for row in csvreader])
 
@@ -292,4 +292,6 @@ def seen_mention(message_id):
 
 
 if __name__ == "__main__":
-    pass
+    the_text = get_donnies_tweet_text()
+    import text_handling as th
+    th.print_indented(the_text)
