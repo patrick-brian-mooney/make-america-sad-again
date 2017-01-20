@@ -30,6 +30,7 @@ import patrick_logger               # https://github.com/patrick-brian-mooney/py
 from patrick_logger import log_it
 
 import trump_utils as tu
+import trump_maint as tm
 
 
 patrick_logger.verbosity_level = 2  # As of 14 January 2017, 3 is the highest meaningful level for this script
@@ -47,13 +48,40 @@ def _get_new_API():
 the_API = _get_new_API()
 
 
+# Convenience functions to get specific data from the data store.
+def get_newest_tweet_id():
+    """Get the ID of the newest tweet that has been received and massaged. As a
+    special case, sets the value to -1, then returns -1, if there are no files
+    in the store of seen, postprocessed tweets.
+    """
+    if tu._num_tweet_files() == 0:
+        tm.set_data_value('newest_tweet_id', -1)
+    return tm.get_key_value_with_default('newest_tweet_id', default=-1)
+
+def get_last_update_date():
+    """Get the last time that the database was updated."""
+    return tm.get_key_value_with_default('last_update_date', default=datetime.datetime.min)
+
+def get_newest_mention_id():
+    """Return the ID of the most recent @mention the program is aware of and has
+    dealt with.
+    """
+    return tm.get_key_value_with_default('last_mention_id', default=-1)
+
+def get_newest_dm_id():
+    """Returns the ID of the most recently seen DM."""
+    if tm.get_key_value_with_default('last_dm_id', default=-1) < max(tm._get_id_set(tu.DMs_store)):
+        tm.set_data_value('last_dm_id', max(tm._get_id_set(DMs_store)))
+    return tm.get_key_value_with_default('last_dm_id', default=-1)
+
+
 # This next group of functions handles the actual creation of tweets based on our stored copies of The Donald's tweets
 def did_donnie_say_it(what):
     """Return True if WHAT has appeared in the Trump tweets we know about, or
     False otherwise.
     """
     try:
-        return (what.strip().lower() in tu.get_donnies_tweet_text().strip().lower())
+        return (what.strip().lower() in tm.get_donnies_tweet_text().strip().lower())
     except Exception as err:
         log_it("WARNING: did_donnie_say_it() encountered error '%s'; assuming he didn't say it" % err, 2)
         return False
@@ -61,7 +89,7 @@ def did_donnie_say_it(what):
 def did_we_say_it(what):
     """Return True if we've previously tweeted WHAT, or False otherwise."""
     try:
-        return (what.strip().lower() in tu.get_our_tweet_text().strip().lower())
+        return (what.strip().lower() in tm.get_our_tweet_text().strip().lower())
     except Exception as err:
         log_it("WARNING: did_we_say_it() encountered error '%s'; assuming we didn't say it" % err, 2)
         return False
@@ -115,7 +143,7 @@ def tweet(text, id=None, date=None):
     with open(tu.tweets_store, mode='a', newline='') as archive_file:
         writer = csv.writer(archive_file)
         writer.writerow([the_status.text, the_status.id, str(the_status.created_at)])
-    the_lines = tu.get_donnies_tweet_text().split('\n')
+    the_lines = tm.get_donnies_tweet_text().split('\n')
 
 
 # This next group of functions handles the downloading, processing, and storing of The Donald's tweets.
@@ -136,7 +164,7 @@ def get_new_tweets(screen_name=tu.target_twitter_id, oldest=-1):
         ret.extend(new_tweets)
         oldest_tweet = ret[-1].id - 1
         log_it("    ...%s tweets downloaded so far" % (len(ret)))
-    tu.set_data_value('newest_tweet_id', max([t.id for t in ret]))
+    tm.set_data_value('newest_tweet_id', max([t.id for t in ret]))
     return [t for t in ret if (t.id > oldest)]
 
 def filter_tweet(tweet_text):
@@ -237,21 +265,21 @@ def save_tweets(the_tweets):
         csvwriter = csv.writer(f)
         for t in the_tweets:
             csvwriter.writerow([t.text, t.id_str, t.created_at])
-    tu.set_data_value('last_update_date', datetime.datetime.now())  # then, update the database of tweet-record filenames and ID numbers
+    tm.set_data_value('last_update_date', datetime.datetime.now())  # then, update the database of tweet-record filenames and ID numbers
 
 def update_tweet_collection():
     """Update the tweet collection."""
     log_it("INFO: updating tweet collection")
-    t = get_new_tweets(screen_name=tu.target_twitter_id, oldest=tu.get_newest_tweet_id())
+    t = get_new_tweets(screen_name=tu.target_twitter_id, oldest=get_newest_tweet_id())
     t = massage_tweets(t)
     save_tweets(t)
-    tu.export_plaintext_tweets()    # Make sure that an up-to-date export is there for applications that consume it.
+    tm.export_plaintext_tweets()    # Make sure that an up-to-date export is there for applications that consume it.
 
 def update_tweet_collection_if_necessary():
     """Once in a while, import new tweets encoding the brilliance that The Donald &
     his team have graced the world by sharing.
     """
-    if tu.force_download or tu._num_tweet_files() == 0 or (datetime.datetime.now()-tu.get_last_update_date()).days > 30 or random.random() < 0.003:
+    if tu.force_download or tu._num_tweet_files() == 0 or (datetime.datetime.now()-get_last_update_date()).days > 30 or random.random() < 0.003:
         update_tweet_collection()
 
 
@@ -260,12 +288,12 @@ def process_command(command, issuer_id):
     """Process a command coming from my own Twitter account."""
     command_parts = [c.strip().lower() for c in command.strip().split() if not c.strip().startswith('@')]
     if command_parts[0] in ['stop', 'quiet', 'silence']:
-        tu.set_data_value('stopped', True)
+        tm.set_data_value('stopped', True)
         sm.send_DM(the_API=the_API, text='You got it, sir, halting tweets per your command.', user=issuer_id)
         log_it('INFO: aborting run because command "%s" was issued.' % command_parts[0])
         sys.exit(0)
     elif command_parts[0] in ['start', 'verbose', 'go', 'loud', 'begin']:
-        tu.set_data_value('stopped', False)
+        tm.set_data_value('stopped', False)
         sm.send_DM(the_API=the_API, text='Yessir, beginning tweeting again per your command.', user=issuer_id)
     elif command_parts[0] in ['update', 'refresh', 'check', 'reload', 'new']:
         update_tweet_collection()
@@ -279,8 +307,8 @@ def handle_mention(mention):
     log_it("text is: %s" % mention.text)
     log_it("user is: @%s" % mention.user.screen_name)
     if mention.user.screen_name.strip('@').lower() == tu.programmer_twitter_id.strip('@').lower():
-        tu.remember_id(tu.mentions_store, mention.id) # Force-learn it now: commands can force-terminate the script.
-        tu.set_data_value('last_mention_id', max(mention.id, tu.get_newest_mention_id()))
+        tm.remember_id(tu.mentions_store, mention.id) # Force-learn it now: commands can force-terminate the script.
+        tm.set_data_value('last_mention_id', max(mention.id, get_newest_mention_id()))
         process_command(mention.text, issuer_id=tu.programmer_twitter_id)
     elif mention.user.screen_name.strip('@').lower().strip() == tu.target_twitter_id:
         log_it("Oh my! The Donald is speaking! Click your jackboots together and salute!")
@@ -288,12 +316,12 @@ def handle_mention(mention):
     else:
         log_it('WARNING: unhandled mention from user @%s' % mention.user.screen_name)
         log_it("the tweet is: %s" % mention.text)
-    tu.remember_id(tu.mentions_store, mention.id)
-    tu.set_data_value('last_mention_id', max(mention.id, tu.get_newest_mention_id()))
+    tm.remember_id(tu.mentions_store, mention.id)
+    tm.set_data_value('last_mention_id', max(mention.id, get_newest_mention_id()))
 
 def check_mentions():
     """A stub to check for any @mentions and, if necessary, reply to them."""
-    for mention in [m for m in tu._get_all_mentions(the_API=the_API) if m.id > tu.get_newest_mention_id()]:
+    for mention in [m for m in tm._get_all_mentions(the_API=the_API) if m.id > get_newest_mention_id()]:
         handle_mention(mention)
 
 def handle_dm(direct_message):
@@ -312,12 +340,12 @@ def handle_dm(direct_message):
         log_it(pprint.pformat(direct_message))
         log_it("Replying with default message")
         sm.send_DM(the_API=the_API, text="Sorry, I'm a bot and don't process direct messages. If you need to reach my human minder, he's @patrick_mooney.", user=direct_message.sender_screen_name)
-    tu.remember_id(tu.DMs_store, direct_message.id)
-    tu.set_data_value('last_dm_id', max(direct_message.id, tu.get_newest_dm_id()))
+    tm.remember_id(tu.DMs_store, direct_message.id)
+    tm.set_data_value('last_dm_id', max(direct_message.id, get_newest_dm_id()))
 
 def check_DMs():
     """Check and handle any direct messages."""
-    for dm in [dm for dm in tu._get_all_DMs(lowest_id=tu.get_newest_dm_id(), the_API=the_API) if not tu.seen_DM(dm.id)]:
+    for dm in [dm for dm in tm._get_all_DMs(lowest_id=get_newest_dm_id(), the_API=the_API) if not tm.seen_DM(dm.id)]:
         handle_dm(dm)
 
 def set_up():
@@ -331,7 +359,7 @@ def set_up():
 
 if __name__ == '__main__':
     set_up()
-    if tu.get_data_value('stopped'):
+    if tm.get_data_value('stopped'):
         log_it('Aborting: user data key "stopped" is set.')
         sys.exit(0)
 
@@ -340,8 +368,8 @@ if __name__ == '__main__':
     # That works out to needing to tweet on 5.57382532% of the script's invocations.
     if tu.force_tweet or random.random() <= 0.0557382532:
         donnies_words = [][:]
-        for the_file in tu._all_donnies_tweet_files():
-            donnies_words += sg.word_list_from_string(tu._get_tweet_archive_text(the_file))
+        for the_file in tm._all_donnies_tweet_files():
+            donnies_words += sg.word_list_from_string(tm._get_tweet_archive_text(the_file))
         starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
         the_tweet = get_tweet(starts, the_mapping)
         tweet(the_tweet)
