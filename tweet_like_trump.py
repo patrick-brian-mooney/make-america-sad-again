@@ -54,7 +54,7 @@ def get_newest_tweet_id():
     special case, sets the value to -1, then returns -1, if there are no files
     in the store of seen, postprocessed tweets.
     """
-    if tu._num_tweet_files() == 0:
+    if tm._num_tweet_files() == 0:
         tm.set_data_value('newest_tweet_id', -1)
     return tm.get_key_value_with_default('newest_tweet_id', default=-1)
 
@@ -279,7 +279,7 @@ def update_tweet_collection_if_necessary():
     """Once in a while, import new tweets encoding the brilliance that The Donald &
     his team have graced the world by sharing.
     """
-    if tu.force_download or tu._num_tweet_files() == 0 or (datetime.datetime.now()-get_last_update_date()).days > 30 or random.random() < 0.003:
+    if tu.force_download or tm._num_tweet_files() == 0 or (datetime.datetime.now()-get_last_update_date()).days > 30 or random.random() < 0.003:
         update_tweet_collection()
 
 

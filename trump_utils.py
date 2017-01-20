@@ -5,9 +5,7 @@ the @false_trump account on Twitter, including those accessible to its
 web page.
 """
 
-
 import glob, datetime, pickle, csv, random, os
-
 
 
 force_download = False      # Set to True to always check for new tweets from Trump .
@@ -33,19 +31,13 @@ my_twitter_id = 'false_trump'  # That's the Twitter username under which the scr
 
 
 # Miscellaneous convenience functions
-def _num_tweet_files():
-    """Convenience function to return the number of files in which The Donald's
-    tweets are stored.
-    """
-    return len(glob.glob('%s/*csv' % donnies_tweets_dir))
-
 def get_tweet_url(account, id):
     """Given a tweet ID and the name of the associated ACCOUNT, generate a URL for
     a tweet.
     """
     return "https://twitter.com/%s/status/%s" % (account, id)
 
-# This group of functions is responsible for picking a tweet at random from a specified archive of tweets.
+# This function is responsible for picking a tweet at random from a specified archive of tweets.
 def get_random_tweet(source_file):
     """Get a random tweet from the .csv archive whose path is passed in as
     SOURCE_FILE.

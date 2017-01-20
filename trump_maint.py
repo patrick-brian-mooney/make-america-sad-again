@@ -11,6 +11,13 @@ from patrick_logger import log_it
 import trump_utils as tu
 
 
+# Miscellaneous convenience functions
+def _num_tweet_files():
+    """Convenience function to return the number of files in which The Donald's
+    tweets are stored.
+    """
+    return len(glob.glob('%s/*csv' % tu.donnies_tweets_dir))
+
 
 # This next group of functions handles storing and retrieving basic program operation parameters (persistent globals).
 # This is actually an inefficient way to do this, but it'll work for the simple tasks the tweeting script needs.
