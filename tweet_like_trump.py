@@ -180,14 +180,14 @@ def filter_tweet(tweet_text):
 
     However, there may need to be more nuanced behavior in the future.
     """
-    if 't.co' in tweet_text:  # Assumption: all URLs coming from Twitter contain Twitter's redirection domain.
+    if 't.co' in tweet_text:        # Assumption: all URLs coming from Twitter contain Twitter's redirection domain.
         return True  # At this time, the text generator doesn't deal well with input text containing URLs.
-    elif '@' in tweet_text:  # Since more than one @mention can occur in a tweet ...
+    elif '@' in tweet_text:         # Since more than one @mention can occur in a tweet ...
         mentions = list(set([w for w in tweet_text.split() if '@' in w]))  # Make a list of all unique @mentions
-        if len(mentions) == 1:  # Allow The Donald to talk about himself (& not other people) without filtering those tweets out.
+        if len(mentions) == 1:      # Allow The Donald to talk about himself (& not other people) without filtering those tweets out.
             return not (th.strip_leading_and_trailing_punctuation(mentions[0].strip()).strip().lower() == tu.target_twitter_id.strip().lower())
-        else:  # Filter out tweets mentioning more than one person:
-            return True  # by def'n, they're not just The Donald being self-aggrandizing.
+        else:               # Filter out tweets mentioning more than one person:
+            return True     # by def'n, they're not just The Donald being self-aggrandizing.
     return False
 
 
@@ -216,21 +216,23 @@ def normalize(the_tweet):
     """
     substitution_list = [['\n', ' '],                   # Newline to space
                          ['  ', ' '],                   # Two spaces to one space
-                         ['U\.S\.A\.', 'U․S․A․'],       # Periods to one-dot leaders
+#                         ['U\.S\.A\.', 'U․S․A․'],       # Periods to one-dot leaders
                          ['U\. S\. A\.', 'U․S․A․'],     # Periods to one-dot leaders, remove spaces
                          ['U\. S\.', 'U․S․'],           # Periods to one-dot leaders, remove spaces
-                         ['U\.S\.', 'U․S․'],            # Periods to one-dot leaders
-                         ['P\.M\.', 'P․M․'],            # Again
+#                         ['U\.S\.', 'U․S․'],            # Periods to one-dot leaders
+#                         ['P\.M\.', 'P․M․'],            # Again
                          ['p\.m\.', 'p․m․'],            # Again
-                         ['A\.M\.', 'A․M․'],            # Again
+#                         ['A\.M\.', 'A․M․'],            # Again
                          ['a\.m\.', 'a․m․'],            # Again
-                         ['V\.P\.', 'V․P․'],            # Again
+#                         ['V\.P\.', 'V․P․'],            # Again
                          ['Mr\.', 'Mr․'],               # Again
                          ['Dr\.', 'Dr․'],               # Again
                          ['Mrs\.', 'Mrs․'],             # Again
+                         ['Pres\.', 'Pres․'],           # Again
                          ['Ms\.', 'Ms․'],               # Again
                          ['Rev\.', 'Rev․'],             # Again
                          ['Sen\.', 'Sen․'],             # Again
+                         ['Gov\.', 'Gov․'],             Again
                          [' \n', '\n'],                 # Space-then-newline to newline
                          ['\.\.\.\.', '...'],               # Four periods to three periods
                          ['\.\.', '.'],                   # Two periods to one period
@@ -247,8 +249,8 @@ def massage_tweets(the_tweets):
     """Make tweets The Donald more suitable for feeding into the Markov-chain,
     generator. Part of this involves silently dropping tweets that can't
     effectively be used by the Markov chain-based generator; once this is done,
-    the remaining tweets are passed through normalize() to smooth out their
-    remaining rough edges.
+    the remaining tweets are passed through normalize() to smooth out (some of)
+    their remaining rough edges.
     """
     return [normalize(t) for t in the_tweets if not filter_tweet(t.text)]
 
@@ -279,7 +281,7 @@ def update_tweet_collection_if_necessary():
     """Once in a while, import new tweets encoding the brilliance that The Donald &
     his team have graced the world by sharing.
     """
-    if tu.force_download or tm._num_tweet_files() == 0 or (datetime.datetime.now()-get_last_update_date()).days > 30 or random.random() < 0.003:
+    if tu.force_download or tm._num_tweet_files() == 0 or (datetime.datetime.now()-get_last_update_date()).days > 30 or random.random() < 0.01:
         update_tweet_collection()
 
 
