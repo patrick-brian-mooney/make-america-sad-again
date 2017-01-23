@@ -141,7 +141,7 @@ def tweet(text, id=None, date=None):
 
     log_it("Adding that tweet to our tweet archive")
     with open(tu.tweets_store, mode='a', newline='') as archive_file:
-        writer = csv.writer(archive_file)
+        writer = csv.writer(archive_file, dialect='unix')
         writer.writerow([the_status.text, the_status.id, str(the_status.created_at)])
     the_lines = tm.get_donnies_tweet_text().split('\n')
 
@@ -232,7 +232,7 @@ def normalize(the_tweet):
                          ['Ms\.', 'Ms․'],               # Again
                          ['Rev\.', 'Rev․'],             # Again
                          ['Sen\.', 'Sen․'],             # Again
-                         ['Gov\.', 'Gov․'],             Again
+                         ['Gov\.', 'Gov․'],             # Again
                          [' \n', '\n'],                 # Space-then-newline to newline
                          ['\.\.\.\.', '...'],               # Four periods to three periods
                          ['\.\.', '.'],                   # Two periods to one period
@@ -264,7 +264,7 @@ def save_tweets(the_tweets):
     if len(the_tweets) == 0:  # If there are no new tweets, don't do anything
         return
     with open('%s/%s.csv' % (tu.donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w', newline="") as f:
-        csvwriter = csv.writer(f)
+        csvwriter = csv.writer(f, dialect='unix')
         for t in the_tweets:
             csvwriter.writerow([t.text, t.id_str, t.created_at])
     tm.set_data_value('last_update_date', datetime.datetime.now())  # then, update the database of tweet-record filenames and ID numbers

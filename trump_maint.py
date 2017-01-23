@@ -202,7 +202,7 @@ def _get_tweet_archive_text(archive_file):
     :return: a string containing the archive of all of our tweets.
     """
     with open(archive_file, newline='') as csvfile:
-        csvreader = csv.reader(csvfile)
+        csvreader = csv.reader(csvfile, dialect='unix')
         return '\n'.join([row[0] for row in csvreader])
 
 def get_our_tweet_text():

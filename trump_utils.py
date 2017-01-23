@@ -43,7 +43,7 @@ def get_random_tweet(source_file):
     SOURCE_FILE.
     """
     with open(source_file, newline='') as the_archive:
-        csvreader = csv.reader(the_archive)
+        csvreader = csv.reader(the_archive, dialect='unix')
         return dict(zip(['text', 'id', 'date' ], random.choice(list(csvreader))))
 
 
