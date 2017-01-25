@@ -127,9 +127,9 @@ def get_tweet(starts, the_mapping):
     while not got_tweet:
         sents = random.choice(range(1, 5))
         log_it("Generating a tweet (%d sentences) ..." % sents)
-        the_tweet = sg.gen_text(the_mapping, starts, markov_length=markov_length, sentences_desired=sents).strip()
+        the_tweet = sg.gen_text(the_mapping, starts, markov_length=markov_length, sentences_desired=sents, paragraph_break_probability=0.1).strip()
         got_tweet = validate_tweet(the_tweet)
-        log_it("length is %d" % len(the_tweet))
+        log_it("    ... length is %d" % len(the_tweet))
     return the_tweet
 
 def tweet(text, id=None, date=None):
