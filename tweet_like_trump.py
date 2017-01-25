@@ -369,8 +369,8 @@ if __name__ == '__main__':
     # That works out to needing to tweet on 5.57382532% of the script's invocations.
     if tu.force_tweet or random.random() <= 0.0557382532:
         donnies_words = [][:]
-        for the_file in tm._all_donnies_tweet_files():
-            donnies_words += sg.word_list_from_string(tm._get_tweet_archive_text(the_file))
+        for the_file in tm.all_donnies_tweet_files():
+            donnies_words += sg.word_list_from_string(tm.get_tweet_archive_text(the_file))
         starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
         the_tweet = get_tweet(starts, the_mapping)
         tweet(the_tweet)

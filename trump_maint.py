@@ -170,8 +170,6 @@ def seen_DM(message_id):
         ret = True
     return ret
 
-# STOPPED HERE
-
 def seen_mention(message_id):
     """Return True if we have seen and processed the @mention before, or False if
     it's new to us. If the data store of seen @mentions does not exist, it's
@@ -188,7 +186,7 @@ def seen_mention(message_id):
 # This next group of functions deals with stored tweet files.
 # These files are .csv files with three columns. Each row has the structure:
 #       [ tweet text, tweet ID, tweet date ]
-def _all_donnies_tweet_files():
+def all_donnies_tweet_files():
     """Convenience function to return a list of all files The Donald's tweets are
     stored in.
 
@@ -196,7 +194,7 @@ def _all_donnies_tweet_files():
     """
     return glob.glob("%s/*csv" % tu.donnies_tweets_dir)
 
-def _get_tweet_archive_text(archive_file):
+def get_tweet_archive_text(archive_file):
     """Returns the full text, and nothing but the text, of all tweets stored in
     a tweet archive .csv file, which stores the text of the tweets in the first
     column of the file.
@@ -212,7 +210,7 @@ def get_our_tweet_text():
 
     :return: a string containing the archive of all of our tweets.
     """
-    return _get_tweet_archive_text(tu.tweets_store)
+    return get_tweet_archive_text(tu.tweets_store)
 
 def get_donnies_tweet_text():
     """Returns the full text of all of The Donald's tweets that this script is
@@ -221,14 +219,14 @@ def get_donnies_tweet_text():
     :return: a string containing the text of all such tweets.
     """
     ret = ""
-    for which_file in _all_donnies_tweet_files():
-        ret += _get_tweet_archive_text(which_file)
+    for which_file in all_donnies_tweet_files():
+        ret += get_tweet_archive_text(which_file)
     return ret
 
 
 # These next two utility functions handle exporting text-only versions of the tweet archive files for consumption by other applications.
 # For instance, starting 20 Jan 2017, they will be a component of my *Ulysses Redux* blog, under the title "Donnie #Stomps thru Dublin"
-def plaintext_export(filename, getter):
+def _plaintext_export(filename, getter):
     """Export all of The Donald's stored tweets into a single plaintext file to be
     consumed by other applications.
     """
@@ -238,8 +236,8 @@ def plaintext_export(filename, getter):
 def export_plaintext_tweets():
     """Produce plaintext versions of the tweet stores, so they 
     """
-    plaintext_export(tu.donnie_plaintext_tweets, get_donnies_tweet_text)
-    plaintext_export(tu.our_plaintext_tweets, get_our_tweet_text)    
+    _plaintext_export(tu.donnie_plaintext_tweets, get_donnies_tweet_text)
+    _plaintext_export(tu.our_plaintext_tweets, get_our_tweet_text)    
 
 if __name__ == "__main__":
     pass
