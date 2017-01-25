@@ -201,6 +201,8 @@ def normalize(the_tweet):
     Currently, "other transformations" means:
         * acronyms are (hopefully) detected, and their periods replaced with one-
           dot leaders, so the Markov chain creator treats them as single words.
+        * tweets beginning or ending with ellipses are combined appropriately with
+          a neighboring tweet.  (#FIXME: currently only partially successful.)
 
     THE_TWEET is a Tweepy tweet object, not a string. (This routine currently
     only deals with THE_TWEET.text, however).
