@@ -43,7 +43,7 @@ print("""<!doctype html>
 <meta name="description" content="Did Donald Trump say it on Twitter? Or was it a mindless robot that studies Donald Trump?" />
 <meta name="rating" content="general" />
 <meta name="revisit-after" content="3 days" />
-<meta name="date" content="2017-01-20T04:40:50-0800" />
+<meta name="date" content="2017-01-25T01:36:29-0800" />
 <meta property="fb:admins" content="100006098197123" />
 <meta property="og:title" content="Did Donnie Say It?" />
 <meta property="og:type" content="website" />

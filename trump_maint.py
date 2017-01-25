@@ -84,7 +84,7 @@ def get_key_value_with_default(key_name, default=None):
 
 
 # This next group of functions handles remembering DMs and @mentions that have been seen (and dealt with) previously.
-def _get_id_set(which_store):
+def get_id_set(which_store):
     """Unpickles and returns a set of ID numbers stored in the file WHICH_STORE.
     Errors in this routine should be caught by the calling function.
     """
@@ -98,7 +98,7 @@ def _store_id_set(which_store, the_set):
 
 def remember_id(which_store, id_num):
     """Add ID_NUM to the set of ID numbers of seen messages stored in WHICH_STORE."""
-    the_set = _get_id_set(which_store)
+    the_set = get_id_set(which_store)
     the_set |= {id_num}
     _store_id_set(which_store, the_set)
 
@@ -108,7 +108,7 @@ def seen_message(message_store, message_id):
     already seen by the script.
     """
     try:
-        return message_id in _get_id_set(message_store)
+        return message_id in get_id_set(message_store)
     except Exception:  # If we can't verify we haven't seen it, ignore it. Don't bother people due to technical errors on our end.
         log_it("WARNING: data store '%s' doesn't exist or is unreadable; creating empty store ... " % message_store, 2)
         with open(message_store, 'wb') as msg_file:

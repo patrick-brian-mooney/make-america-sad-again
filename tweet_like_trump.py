@@ -70,8 +70,8 @@ def get_newest_mention_id():
 
 def get_newest_dm_id():
     """Returns the ID of the most recently seen DM."""
-    if tm.get_key_value_with_default('last_dm_id', default=-1) < max(tm._get_id_set(tu.DMs_store)):
-        tm.set_data_value('last_dm_id', max(tm._get_id_set(tu.DMs_store)))
+    if tm.get_key_value_with_default('last_dm_id', default=-1) < max(tm.get_id_set(tu.DMs_store)):
+        tm.set_data_value('last_dm_id', max(tm.get_id_set(tu.DMs_store)))
     return tm.get_key_value_with_default('last_dm_id', default=-1)
 
 

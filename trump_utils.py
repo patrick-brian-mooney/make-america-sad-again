@@ -48,7 +48,7 @@ def get_random_tweet(source_file):
 
 
 if __name__ == "__main__":
-    import trump_maintenance as tm
+    import trump_maint as tm
     import text_handling as th
     the_text = tm.get_donnies_tweet_text()
     th.print_indented(the_text)
