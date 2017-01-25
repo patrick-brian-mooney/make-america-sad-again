@@ -234,10 +234,10 @@ def normalize(the_tweet):
                          ['Sen\.', 'Sen․'],             # Again
                          ['Gov\.', 'Gov․'],             # Again
                          [' \n', '\n'],                 # Space-then-newline to newline
-                         ['\.\.\.\.', '...'],               # Four periods to three periods
-                         ['\.\.', '.'],                   # Two periods to one period
-                         ['\.\.\.', '…'],                  # Three periods to ellipsis
-                         ['…\.', '…'],                   # Ellipsis-period to ellipsis. …. may be allowable, but is unlikely for Donnie.
+                         ['\.\.\.\.', '...'],           # Four periods to three periods
+                         ['\.\.', '.'],                 # Two periods to one period
+                         ['\.\.\.', '…'],               # Three periods to ellipsis
+                         ['…\.', '…'],                  # Ellipsis-period to ellipsis. …. may be allowable, but is unlikely for Donnie.
                          ['……', '…'],                   # Double-ellipsis to ellipsis.
                          ['… …', '…'],                  # Double-ellipsis-with-space to ellipsis
                         ]
@@ -245,13 +245,34 @@ def normalize(the_tweet):
     the_tweet.text = th.multi_replace(html.unescape(th.multi_replace(the_tweet.text, substitution_list)),substitution_list)
     return the_tweet
 
+def combine_long_tweets(tweets_list):
+    """Takes a list of tweepy.Tweet objects and looks through them for tweets
+    ending with an ellipsis. If it finds one,
+    """
+    ret = [][:]
+    tweets = tweets_list[:]     # Operate on a local copy.
+    while tweets:
+        t = tweets.pop()        # Get a tweet, then pre-process it to normalize the form of ellipses.
+        t.text = th.multi_replace(t.text, [['\.\.\.\.', '...'], ['\.\.', '.'], ['\.\.\.', '…'], ['…\.', '…'], ['……', '…'], ['… …', '…']]).strip()
+        while tweets and t.text.endswith('…'):  # Add to text of current tweet, and invalidate other params to signal it's a modified combination tweet.
+            new_t = tweets.pop()
+            new_t.text = th.multi_replace(new_t.text, [['\.\.\.\.', '...'], ['\.\.', '.'], ['\.\.\.', '…'], ['…\.', '…'], ['……', '…'], ['… …', '…']]).strip()
+            t.text = "%s %s" % (t.text.rstrip().rstrip('…').rstrip(), new_t.text.lstrip().lstrip('…').lstrip())
+            t.text = t.text.strip()
+            t.id_str, t.created_at = "", ""     # Invalidate these params to signal we've modified the text, even if just by properly combining tweet text.
+        ret += [t]
+    return ret
+
 def massage_tweets(the_tweets):
     """Make tweets The Donald more suitable for feeding into the Markov-chain,
     generator. Part of this involves silently dropping tweets that can't
     effectively be used by the Markov chain-based generator; once this is done,
     the remaining tweets are passed through normalize() to smooth out (some of)
     their remaining rough edges.
+
+    THE_TWEETS is a list of tweepy.Tweet objects.
     """
+    the_tweets = combine_long_tweets(the_tweets)
     return [normalize(t) for t in the_tweets if not filter_tweet(t.text)]
 
 def save_tweets(the_tweets):
