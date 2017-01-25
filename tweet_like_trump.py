@@ -201,6 +201,8 @@ def normalize(the_tweet):
     Currently, "other transformations" means:
         * acronyms are (hopefully) detected, and their periods replaced with one-
           dot leaders, so the Markov chain creator treats them as single words.
+        * tweets beginning or ending with ellipses are combined appropriately with
+          a neighboring tweet.  (#FIXME: currently only partially successful.)
 
     THE_TWEET is a Tweepy tweet object, not a string. (This routine currently
     only deals with THE_TWEET.text, however).
@@ -216,15 +218,10 @@ def normalize(the_tweet):
     """
     substitution_list = [['\n', ' '],                   # Newline to space
                          ['  ', ' '],                   # Two spaces to one space
-#                         ['U\.S\.A\.', 'U․S․A․'],       # Periods to one-dot leaders
                          ['U\. S\. A\.', 'U․S․A․'],     # Periods to one-dot leaders, remove spaces
                          ['U\. S\.', 'U․S․'],           # Periods to one-dot leaders, remove spaces
-#                         ['U\.S\.', 'U․S․'],            # Periods to one-dot leaders
-#                         ['P\.M\.', 'P․M․'],            # Again
                          ['p\.m\.', 'p․m․'],            # Again
-#                         ['A\.M\.', 'A․M․'],            # Again
                          ['a\.m\.', 'a․m․'],            # Again
-#                         ['V\.P\.', 'V․P․'],            # Again
                          ['Mr\.', 'Mr․'],               # Again
                          ['Dr\.', 'Dr․'],               # Again
                          ['Mrs\.', 'Mrs․'],             # Again
@@ -248,15 +245,19 @@ def normalize(the_tweet):
 def combine_long_tweets(tweets_list):
     """Takes a list of tweepy.Tweet objects and looks through them for tweets
     ending with an ellipsis. If it finds one,
+
+    #FIXME: handling of two-dot ellipses needs testing, and there's no handling
+    at all of tweets that BEGIN WITH an ellipsis if the previous tweet doesn't
+    end with an ellipsis.
     """
     ret = [][:]
     tweets = tweets_list[:]     # Operate on a local copy.
     while tweets:
         t = tweets.pop()        # Get a tweet, then pre-process it to normalize the form of ellipses.
-        t.text = th.multi_replace(t.text, [['\.\.\.\.', '...'], ['\.\.', '.'], ['\.\.\.', '…'], ['…\.', '…'], ['……', '…'], ['… …', '…']]).strip()
+        t.text = th.multi_replace(t.text, [['\.\.\.\.', '...'], ['\.\.', '…'], ['\.\.\.', '…'], ['…\.', '…'], ['……', '…'], ['… …', '…']]).strip()
         while tweets and t.text.endswith('…'):  # Add to text of current tweet, and invalidate other params to signal it's a modified combination tweet.
             new_t = tweets.pop()
-            new_t.text = th.multi_replace(new_t.text, [['\.\.\.\.', '...'], ['\.\.', '.'], ['\.\.\.', '…'], ['…\.', '…'], ['……', '…'], ['… …', '…']]).strip()
+            new_t.text = th.multi_replace(new_t.text, [['\.\.\.\.', '...'], ['\.\.', '…'], ['\.\.\.', '…'], ['…\.', '…'], ['……', '…'], ['… …', '…']]).strip()
             t.text = "%s %s" % (t.text.rstrip().rstrip('…').rstrip(), new_t.text.lstrip().lstrip('…').lstrip())
             t.text = t.text.strip()
             t.id_str, t.created_at = "", ""     # Invalidate these params to signal we've modified the text, even if just by properly combining tweet text.
