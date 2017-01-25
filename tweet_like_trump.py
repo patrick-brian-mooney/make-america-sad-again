@@ -321,8 +321,9 @@ def handle_mention(mention):
 
 def check_mentions():
     """A stub to check for any @mentions and, if necessary, reply to them."""
-    for mention in [m for m in tm._get_all_mentions(the_API=the_API) if m.id > get_newest_mention_id()]:
-        handle_mention(mention)
+    for mention in [m for m in tm.get_all_mentions(the_API=the_API) if m.id > get_newest_mention_id()]:
+        if not tm.seen_mention(mention.id):
+            handle_mention(mention)
 
 def handle_dm(direct_message):
     """Handle a given direct message. Currently, it just treats any DM from me as a
@@ -345,7 +346,7 @@ def handle_dm(direct_message):
 
 def check_DMs():
     """Check and handle any direct messages."""
-    for dm in [dm for dm in tm._get_all_DMs(lowest_id=get_newest_dm_id(), the_API=the_API) if not tm.seen_DM(dm.id)]:
+    for dm in [dm for dm in tm.get_all_DMs(lowest_id=get_newest_dm_id(), the_API=the_API) if not tm.seen_DM(dm.id)]:
         handle_dm(dm)
 
 def set_up():

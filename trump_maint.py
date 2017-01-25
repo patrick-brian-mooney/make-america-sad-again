@@ -102,7 +102,7 @@ def remember_id(which_store, id_num):
     the_set |= {id_num}
     _store_id_set(which_store, the_set)
 
-def seen_message(message_store, message_id):
+def _seen_message(message_store, message_id):
     """Return True if the id MESSAGE_ID is in the MESSAGE_STORE data set, or
     False otherwise. Each MESSAGE_STORE file is a pickled set of IDs of messages
     already seen by the script.
@@ -129,7 +129,7 @@ def _get_all_messages(source):
                 ret += [item]
     return ret
 
-def _get_all_DMs(the_API, lowest_id=-1):
+def get_all_DMs(the_API, lowest_id=-1):
     """Get a list of all DMs, ever; or, all DMs after the optional
     LOWEST_ID parameter.
 
@@ -137,38 +137,40 @@ def _get_all_DMs(the_API, lowest_id=-1):
     """
     return [dm for dm in _get_all_messages(lambda: the_API.direct_messages(count=100, full_text=True, since_id=lowest_id))]
 
-def _get_all_mentions(the_API):
-    """Get a list of all @mentions, ever. Needs a Tweepy API object, the_API"""
+def get_all_mentions(the_API):
+    """Get a list of all @mentions, ever. Needs a Tweepy API object, THE_API"""
     return [m for m in _get_all_messages(lambda: the_API.mentions_timeline(count=100))]
 
-def learn_all_DMs():
+def _learn_all_DMs():
     """Get a list of all the DMs that have ever been sent, and add them to the list
     of DMs we've ever seen. This only happens automatically if the DM store is
     recreated, on the theory that we shouldn't bother people by responding to
     DMs that have already been responded to just because some technical error on
     our end has caused the DM store to become unreadable.
     """
-    log_it("INFO: learn_all_DMs() called to recreate list")
-    _store_id_set(DMs_store, {dm.id for dm in _get_all_DMs()})
+    log_it("INFO: _learn_all_DMs() called to recreate list")
+    _store_id_set(DMs_store, {dm.id for dm in get_all_DMs()})
 
-def learn_all_mentions():
+def _learn_all_mentions():
     """Get a list of all @mentions that have ever been sent, and add them to the
     set of @mentions we've ever seen. This only happens automatically under the
-    same circumstances and for the same reasons as with learn_all_DMs(), above.
+    same circumstances and for the same reasons as with _learn_all_DMs(), above.
     """
-    log_it("INFO: learn_all_mentions() called to recreate list")
-    _store_id_set(mentions_store, {m.id for m in _get_all_mentions()})
+    log_it("INFO: _learn_all_mentions() called to recreate list")
+    _store_id_set(mentions_store, {m.id for m in get_all_mentions()})
 
 def seen_DM(message_id):
     """Return True if the DM has been seen before, False otherwise. If the data store
     of seen DMs does not exist, it's created, and all DMs ever sent are treated
     as seen.
     """
-    ret = seen_message(tu.DMs_store, message_id)
+    ret = _seen_message(tu.DMs_store, message_id)
     if ret is None:
-        learn_all_DMs()
+        _learn_all_DMs()
         ret = True
     return ret
+
+# STOPPED HERE
 
 def seen_mention(message_id):
     """Return True if we have seen and processed the @mention before, or False if
@@ -177,9 +179,9 @@ def seen_mention(message_id):
     been processed already: we don't want to bother people by interacting with
     them again for a @mention we've already responded to.
     """
-    ret = seen_message(mentions_store, message_id)
+    ret = _seen_message(mentions_store, message_id)
     if ret is None:
-        learn_all_mentions()
+        _learn_all_mentions()
         ret = True
     return ret
 
