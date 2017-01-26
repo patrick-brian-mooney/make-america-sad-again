@@ -244,11 +244,9 @@ def normalize(the_tweet):
 
 def combine_long_tweets(tweets_list):
     """Takes a list of tweepy.Tweet objects and looks through them for tweets
-    ending with an ellipsis. If it finds one,
-
-    #FIXME: handling of two-dot ellipses needs testing, and there's no handling
-    at all of tweets that BEGIN WITH an ellipsis if the previous tweet doesn't
-    end with an ellipsis.
+    beginning or ending with an ellipsis. If it finds one, it combines it
+    appropriately with an adjacent tweet and invalidates some other information
+    to signal that the tweet has been edited in this way.
     """
     ret = [][:]
     tweets = tweets_list[:]     # Operate on a local copy.
