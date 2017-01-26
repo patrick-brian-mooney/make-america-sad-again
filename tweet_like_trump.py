@@ -252,18 +252,32 @@ def combine_long_tweets(tweets_list):
     """
     ret = [][:]
     tweets = tweets_list[:]     # Operate on a local copy.
-    while tweets:
+    while tweets:               # First, go through tweets, looking for tweets ending with an ellipsis
         t = tweets.pop()        # Get a tweet, then pre-process it to normalize the form of ellipses.
-        t.text = th.multi_replace(t.text, [['\.\.\.\.', '...'], ['\.\.', '…'], ['\.\.\.', '…'], ['…\.', '…'], ['……', '…'], ['… …', '…']]).strip()
-        while tweets and t.text.endswith('…'):  # Add to text of current tweet, and invalidate other params to signal it's a modified combination tweet.
+        t.text = th.multi_replace(t.text, [['\.\.\.\.', '...'], ['\.\.', '…'], ['\.\.\.', '…'], ['…\.', '…'],
+                                           ['……', '…'], ['… …', '…']
+                                          ]).strip()
+        while tweets and t.text.endswith('…'):  # Add to text of current tweet
             new_t = tweets.pop()
-            new_t.text = th.multi_replace(new_t.text, [['\.\.\.\.', '...'], ['\.\.', '…'], ['\.\.\.', '…'], ['…\.', '…'], ['……', '…'], ['… …', '…']]).strip()
+            new_t.text = th.multi_replace(new_t.text, [['\.\.\.\.', '...'], ['\.\.', '…'], ['\.\.\.', '…'],
+                                                       ['…\.', '…'], ['……', '…'], ['… …', '…']
+                                                      ]).strip()
             t.text = "%s %s" % (t.text.rstrip().rstrip('…').rstrip(), new_t.text.lstrip().lstrip('…').lstrip())
             t.text = t.text.strip()
-            t.id_str, t.created_at = "", ""     # Invalidate these params to signal we've modified the text, even if just by properly combining tweet text.
+            t.id_str, t.created_at = "", ""     # Invalidate these params to signal we've modified the text.
+        ret += [t]
+    tweets, ret = ret[:], [][:]                 # Go through again, looking at the beginnings of tweets.
+    while tweets:                               # (The Donald is inconsistent in where he puts the ellipsis.) 
+        t = tweets.pop()                        # At least we've already preprocessed ellipses.
+        while tweets and tweets[0].text.startswith('…'):    # If the next tweet on the stack begins with an ellipsis
+            new_t = tweets.pop()
+            t.text = "%s %s" % (t.text.rstrip().rstrip('…').rstrip(), new_t.text.lstrip().lstrip('…').lstrip())
+            t.text = t.text.strip()
+            t.id_str, t.created_at = "", ""
         ret += [t]
     return ret
-
+        
+        
 def massage_tweets(the_tweets):
     """Make tweets The Donald more suitable for feeding into the Markov-chain,
     generator. Part of this involves silently dropping tweets that can't
