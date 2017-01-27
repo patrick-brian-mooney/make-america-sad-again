@@ -19,6 +19,7 @@ tu.mentions_store = ""
 tu.donnies_tweets_dir = ""
 tu.our_minimal_tweets = "%s/false_trump.csv" % tu.data_dir
 tu.donnies_minimal_tweets = "%s/trump.csv" % tu.data_dir
+tu.answer_counts = '%s/stats.csv' % tu.base_dir
 
 print("""<!doctype html>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
@@ -43,7 +44,7 @@ print("""<!doctype html>
 <meta name="description" content="Did Donald Trump say it on Twitter? Or was it a mindless robot that studies Donald Trump?" />
 <meta name="rating" content="general" />
 <meta name="revisit-after" content="3 days" />
-<meta name="date" content="2017-01-27T03:59:13-0800" />
+<meta name="date" content="2017-01-27T04:16:48-0800" />
 <meta property="fb:admins" content="100006098197123" />
 <meta property="og:title" content="Did Donnie Say It?" />
 <meta property="og:type" content="website" />
