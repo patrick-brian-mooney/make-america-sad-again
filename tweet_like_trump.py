@@ -288,7 +288,7 @@ def massage_tweets(the_tweets):
     the_tweets = combine_long_tweets(the_tweets)
     return [normalize(t) for t in the_tweets if not filter_tweet(t.text)]
 
-def save_tweets(the_tweets):
+def save_donnies_tweets(the_tweets):
     """Save the text from THE_TWEETS to a CSV file, and update the stored data.
     THE_TWEETS is a list of tweepy.Tweet objects, not strings.
 
@@ -297,10 +297,7 @@ def save_tweets(the_tweets):
     """
     if len(the_tweets) == 0:  # If there are no new tweets, don't do anything
         return
-    with open('%s/%s.csv' % (tu.donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w', newline="") as f:
-        csvwriter = csv.writer(f, dialect='unix')
-        for t in the_tweets:
-            csvwriter.writerow([t.text, t.id_str, t.created_at])
+    tm.save_tweets([[t.text, t.id_str, t.created_at] for t in the_tweets], '%s/%s.csv' % (tu.donnies_tweets_dir, datetime.datetime.now().isoformat()))
     tm.set_data_value('last_update_date', datetime.datetime.now())  # then, update the database of tweet-record filenames and ID numbers
 
 def update_tweet_collection():
@@ -308,7 +305,7 @@ def update_tweet_collection():
     log_it("INFO: updating tweet collection")
     t = get_new_tweets(screen_name=tu.target_twitter_id, oldest=get_newest_tweet_id())
     t = massage_tweets(t)
-    save_tweets(t)
+    save_donnies_tweets(t)
     tm.export_plaintext_tweets()    # Make sure that an up-to-date export is there for applications that consume it.
 
 def update_tweet_collection_if_necessary():

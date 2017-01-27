@@ -12,7 +12,7 @@ import trump_utils as tu
 # Overwrite some values from trump_utils.py with web server locations.
 tu.base_dir = '/home/public/~patrick/projects/TrumpQuiz' 
 tu.data_dir = tu.base_dir
-tu.data_store = '%s/TrumpTweets_data.pkl' % tu.data_dir
+tu.data_store = ""  # '%s/TrumpTweets_data.pkl' % tu.data_dir
 tu.tweets_store = ""
 tu.DMs_store = ""
 tu.mentions_store = ""
@@ -43,7 +43,7 @@ print("""<!doctype html>
 <meta name="description" content="Did Donald Trump say it on Twitter? Or was it a mindless robot that studies Donald Trump?" />
 <meta name="rating" content="general" />
 <meta name="revisit-after" content="3 days" />
-<meta name="date" content="2017-01-25T01:36:29-0800" />
+<meta name="date" content="2017-01-27T03:30:16-0800" />
 <meta property="fb:admins" content="100006098197123" />
 <meta property="og:title" content="Did Donnie Say It?" />
 <meta property="og:type" content="website" />

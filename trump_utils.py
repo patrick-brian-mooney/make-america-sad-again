@@ -19,8 +19,8 @@ DMs_store = '%s/seen_DMs.pkl' % data_dir
 mentions_store = '%s/seen_mentions.pkl' % data_dir
 donnies_tweets_dir = "%s/donnies_tweets" % data_dir
 
-our_minimal_tweets = tweets_store                                                           # FIXME: this should in fact be a subset
-donnies_minimal_tweets = '/TrumpTweets/data/donnies_tweets/2017-01-19T17:45:19.991927.csv'  # FIXME: this should in fact be a subset
+our_minimal_tweets = '/~patrick/projects/TrumpQuiz/false_trump.csv'     # Where to export our selected tweets for the web quiz: local folder 
+donnies_minimal_tweets = '/~patrick/projects/TrumpQuiz/trump.csv'       # same, for selected tweets of Trump.
 
 donnie_plaintext_tweets = '%s/donnie_plaintext_tweets.txt' % data_dir
 our_plaintext_tweets = '%s/our_plaintext_tweets.txt' % data_dir

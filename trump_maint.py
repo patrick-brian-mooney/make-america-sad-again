@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Part of Patrick Mooney's TrumpTweets project. This file holds utility code
-for maintaining the state of the project as a whole."""
+for maintaining the state of the project as a whole.
+"""
 
 
-import pickle, glob, csv
+import pickle, glob, csv, random
 
 from patrick_logger import log_it
 
@@ -31,7 +32,7 @@ def _get_data_store():
         with open(tu.data_store, 'rb') as the_data_file:
             return pickle.load(the_data_file)
     except Exception:
-        log_it('WARNING: Data store does not exist or cannot be read, creating ...')
+        log_it('WARNING: Data store does not exist or cannot be read; creating new data store ...')
         the_data = {'purpose': 'data store for the TrumpTweets project at @false_trump',
                     'program author': 'Patrick Mooney',
                     'script URL': 'https://github.com/patrick-brian-mooney/make-america-sad-again',
@@ -45,9 +46,9 @@ def set_data_value(keyname, value):
     """Store a VALUE, by KEYNAME, in the persistent data store. This data store is
     read from disk, modified, and immediately written back to disk. This is a
     naive function that doesn't worry about multiple simultaneous attempts to
-    access the store: there should never be any. (This script should be the only
-    process accessing the file, and there should only be one invocation running
-    at a time.)
+    access the store: there should never be any. (tweet_like_trump.py should be
+    the only process accessing the file, and there should only be one
+    invocation running at a time.)
     """
     the_data = _get_data_store()
     the_data[keyname] = value
@@ -223,6 +224,52 @@ def get_donnies_tweet_text():
         ret += get_tweet_archive_text(which_file)
     return ret
 
+
+# These next few functions handle exporting a randomly selected group of tweets for the web quiz. Running these functions (manually) from
+# time to time will help keep the web quiz from repeating the same questions too much.
+def save_tweets(tweets, archive_file):
+    """Save the tweets in TWEETS to ARCHIVE_FILE.
+    TWEETS is a list of [text, ID, date] lists.
+    ARCHIVE_FILE is the filename of the .csv file to create or overwrite.
+    """
+    with open(archive_file, 'w', newline="") as f:
+        csvwriter = csv.writer(f, dialect='unix')
+        for t in tweets:
+            csvwriter.writerow(t)
+
+def _get_all_exact_tweets(archive_file):
+    """Get all tweets stored in the .csv file specified by STORE, provided that
+    they have attributed ID and timestamp attributes. These tweets are "exact"
+    tweets (a bit of a misnomer because they have had some punctuation
+    processing and other minor tweaks), i.e. they can be sourced to a single
+    individual tweet by The Donald that is not part of a larger (ellipsis-
+    delimited) tweet-spanning statement.
+    
+    RETURNS a list of lists of strings: [ tweet text, tweet ID, tweet date ] 
+    """
+    with open(archive_file, newline='') as csvfile:
+        csvreader = csv.reader(csvfile, dialect='unix')
+        return [item for item in csvreader if item[1] and item[2]]  # Filter out empty IDs and empty timestamps
+
+def _get_our_exact_tweets():
+    """Returns a list -- [tweet text, tweet ID, tweet date] -- of all our tweets."""
+    return _get_all_exact_tweets(tu.tweets_store)
+    
+def _get_donnies_exact_tweets():
+    """Returns a list, as with get_all_our_tweets(), of all of Donnie's tweets."""
+    ret = [][:]
+    for the_archive in all_donnies_tweet_files():
+        ret.extend(_get_all_exact_tweets(the_archive))
+    return ret
+
+def select_new_tweets(num_selected=200):
+    """Pick NUM_SELECTED new tweets from each tweet store at random, and save those
+    tweets to the appropriate places for the web quiz to pick them up. This
+    function is never called automatically; it's just for maintenance work.
+    """
+    save_tweets(random.sample(_get_our_exact_tweets(), num_selected), tu.our_minimal_tweets)
+    save_tweets(random.sample(_get_donnies_exact_tweets(), num_selected), tu.donnies_minimal_tweets)
+ 
 
 # These next two utility functions handle exporting text-only versions of the tweet archive files for consumption by other applications.
 # For instance, starting 20 Jan 2017, they will be a component of my *Ulysses Redux* blog, under the title "Donnie #Stomps thru Dublin"
