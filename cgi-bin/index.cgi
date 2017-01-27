@@ -44,7 +44,7 @@ print("""<!doctype html>
 <meta name="description" content="Did Donald Trump say it on Twitter? Or was it a mindless robot that studies Donald Trump?" />
 <meta name="rating" content="general" />
 <meta name="revisit-after" content="3 days" />
-<meta name="date" content="2017-01-27T04:16:48-0800" />
+<meta name="date" content="2017-01-27T12:31:55-0800" />
 <meta property="fb:admins" content="100006098197123" />
 <meta property="og:title" content="Did Donnie Say It?" />
 <meta property="og:type" content="website" />
@@ -108,7 +108,10 @@ if 'tweet_text' in form:
     print("""<h2 style="clear:both;">Let's try another one.</h2>""")
 
 
-# OK, summarize previous stats.
+tdata = tu.get_stats_dictionary()
+
+print("""<p><a rel="me" href="index.cgi">This quiz</a> has been taken %d times; users have correctly identified the source of quotes %0.2f %% of the time. <a rel="me" href="stats.cgi">More stats</a>.</p>
+"""  % (sum(tdata.values()), 100 * ((tdata['trump_right'] + tdata['algorithm_right']) / sum(tdata.values()))))
 
 
 print("""<p>Take a look at the quote below. There's a 50% chance that Donald Trump said it on Twitter, and a 50% chance it was generated at random by a mindless computer program. Can you tell which it is?</p>""")

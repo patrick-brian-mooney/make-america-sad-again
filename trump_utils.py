@@ -51,26 +51,29 @@ def get_random_tweet(source_file):
 
 # This next group of functions maintains 
 def _create_stats_file():
-    """Let's hope this only ever gets called the very first time stats get counted. Otherwise, it means we've lost count and are starting over.
+    """For the sake of being explicit:
+      trump_right means USER CORRECTLY IDENTIFIED A QUOTE AS COMING FROM DONALD TRUMP
+      trump_wrong means USER SAID IT WAS FROM DONALD TRUMP, BUT THAT WAS WRONG
     
-    For the sake of being explicit:
-          trump_right means USER CORRECTLY IDENTIFIED A QUOTE AS COMING FROM DONALD TRUMP
-          trump_wrong means USER SAID IT WAS FROM DONALD TRUMP, BUT THAT WAS WRONG (e.g., wasn't able to identify a quote from the algorithm)
-    
-    Same deal for algorithm_right and algorithm_wrong.
+    Same for algorithm_right and algorithm_wrong.
     """
     empty_counts = {
         'trump_right': 0,
         'trump_wrong': 0,
         'algorithm_right': 0,
         'algorithm_wrong': 0}
-    stats_file = open(answer_counts, 'w', newline='')
-    writer = csv.writer(stats_file)
-    for which_key in empty_counts:
-        writer.writerow([which_key, empty_counts[which_key]])
-    stats_file.close()
+    with open(answer_counts, 'w', newline='') as f:
+        writer = csv.writer(stats_file)
+        for which_key in empty_counts:
+            writer.writerow([which_key, empty_counts[which_key]])
+
+def get_stats_dictionary():
+    """Returns a dictionary recording guess counts."""
+    with open(answer_counts, newline='') as stats_file:
+        return {rows[0]:int(rows[1]) for rows in csv.reader(stats_file)}
 
 def bump_count(which_key):
+    """Increases the count of """
     try:
         fd_file = os.open(answer_counts, (os.O_RDWR | os.O_EXCL))
     except FileNotFoundError:
