@@ -158,7 +158,7 @@ def _learn_all_mentions():
     same circumstances and for the same reasons as with _learn_all_DMs(), above.
     """
     log_it("INFO: _learn_all_mentions() called to recreate list")
-    _store_id_set(mentions_store, {m.id for m in get_all_mentions()})
+    _store_id_set(tu.mentions_store, {m.id for m in get_all_mentions()})
 
 def seen_DM(message_id):
     """Return True if the DM has been seen before, False otherwise. If the data store
@@ -178,7 +178,7 @@ def seen_mention(message_id):
     been processed already: we don't want to bother people by interacting with
     them again for a @mention we've already responded to.
     """
-    ret = _seen_message(mentions_store, message_id)
+    ret = _seen_message(tu.mentions_store, message_id)
     if ret is None:
         _learn_all_mentions()
         ret = True
@@ -193,7 +193,7 @@ def all_donnies_tweet_files():
 
     :return: a list of these files.
     """
-    return glob.glob("%s/*csv" % tu.donnies_tweets_dir)
+    return sorted(glob.glob("%s/*csv" % tu.donnies_tweets_dir))
 
 def get_tweet_archive_text(archive_file):
     """Returns the full text, and nothing but the text, of all tweets stored in
@@ -244,8 +244,8 @@ def _get_all_exact_tweets(archive_file):
     processing and other minor tweaks), i.e. they can be sourced to a single
     individual tweet by The Donald that is not part of a larger (ellipsis-
     delimited) tweet-spanning statement.
-    
-    RETURNS a list of lists of strings: [ tweet text, tweet ID, tweet date ] 
+
+    RETURNS a list of lists of strings: [ tweet text, tweet ID, tweet date ]
     """
     with open(archive_file, newline='') as csvfile:
         csvreader = csv.reader(csvfile, dialect='unix')
@@ -254,7 +254,7 @@ def _get_all_exact_tweets(archive_file):
 def _get_our_exact_tweets():
     """Returns a list -- [tweet text, tweet ID, tweet date] -- of all our tweets."""
     return _get_all_exact_tweets(tu.tweets_store)
-    
+
 def _get_donnies_exact_tweets():
     """Returns a list, as with get_all_our_tweets(), of all of Donnie's tweets."""
     ret = [][:]
@@ -269,7 +269,7 @@ def select_new_tweets(num_selected=200):
     """
     save_tweets(random.sample(_get_our_exact_tweets(), num_selected), tu.our_minimal_tweets)
     save_tweets(random.sample(_get_donnies_exact_tweets(), num_selected), tu.donnies_minimal_tweets)
- 
+
 
 # These next two utility functions handle exporting text-only versions of the tweet archive files for consumption by other applications.
 # For instance, starting 20 Jan 2017, they will be a component of my *Ulysses Redux* blog, under the title "Donnie #Stomps thru Dublin"
@@ -281,10 +281,10 @@ def _plaintext_export(filename, getter):
         export_file.write(getter())
 
 def export_plaintext_tweets():
-    """Produce plaintext versions of the tweet stores, so they 
+    """Produce plaintext versions of the tweet stores, so they
     """
     _plaintext_export(tu.donnie_plaintext_tweets, get_donnies_tweet_text)
-    _plaintext_export(tu.our_plaintext_tweets, get_our_tweet_text)    
+    _plaintext_export(tu.our_plaintext_tweets, get_our_tweet_text)
 
 if __name__ == "__main__":
     pass

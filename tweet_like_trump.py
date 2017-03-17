@@ -37,15 +37,7 @@ patrick_logger.verbosity_level = 2  # As of 14 January 2017, 3 is the highest me
 
 markov_length = 2
 
-def _get_new_API():
-    """Get an instance of the Tweepy API object to work with."""
-    auth = tweepy.OAuthHandler(Trump_client['consumer_key'], Trump_client['consumer_secret'])
-    auth.set_access_token(Trump_client['access_token'], Trump_client['access_token_secret'])
-    ret = tweepy.API(auth)
-    ret.wait_on_rate_limit, ret.wait_on_rate_limit_notify = True, True
-    return ret
-
-the_API = _get_new_API()
+the_API = sm.get_new_twitter_API(Trump_client)
 
 
 # Convenience functions to get specific data from the data store.
@@ -137,7 +129,7 @@ def tweet(text, id=None, date=None):
     the script.
     """
     log_it("Tweet is: '%s'. Posting ..." % text)
-    the_status = sm.post_tweet(Trump_client, text)
+    the_status = sm.post_tweet(text, Trump_client)
 
     log_it("Adding that tweet to our tweet archive")
     with open(tu.tweets_store, mode='a', newline='') as archive_file:
@@ -265,7 +257,7 @@ def combine_long_tweets(tweets_list):
             t.id_str, t.created_at = "", ""     # Invalidate these params to signal we've modified the text.
         ret += [t]
     tweets, ret = ret[:], [][:]                 # Go through again, looking at the beginnings of tweets.
-    while tweets:                               # (The Donald is inconsistent in where he puts the ellipsis.) 
+    while tweets:                               # (The Donald is inconsistent in where he puts the ellipsis.)
         t = tweets.pop()                        # At least we've already preprocessed ellipses.
         while tweets and tweets[0].text.startswith('…'):    # If the next tweet on the stack begins with an ellipsis
             new_t = tweets.pop()
@@ -274,8 +266,8 @@ def combine_long_tweets(tweets_list):
             t.id_str, t.created_at = "", ""
         ret += [t]
     return ret
-        
-        
+
+
 def massage_tweets(the_tweets):
     """Make tweets The Donald more suitable for feeding into the Markov-chain,
     generator. Part of this involves silently dropping tweets that can't
@@ -399,9 +391,11 @@ if __name__ == '__main__':
     # If this script is called every fifteen minutes by a cron job, that's 96 times/day
     # That works out to needing to tweet on 5.57382532% of the script's invocations.
     if tu.force_tweet or random.random() <= 0.0557382532:
-        donnies_words = [][:]
-        for the_file in tm.all_donnies_tweet_files():
-            donnies_words += sg.word_list_from_string(tm.get_tweet_archive_text(the_file))
+        tweet_files = tm.all_donnies_tweet_files()
+        first_file = tweet_files.pop()                  # De-emphasize the first file.
+        donnies_words = sg.word_list_from_string(tm.get_tweet_archive_text(first_file))
+        for the_file in tweet_files:
+            donnies_words += sg.word_list_from_string(tm.get_tweet_archive_text(the_file)) * 3
         starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
         the_tweet = get_tweet(starts, the_mapping)
         tweet(the_tweet)
