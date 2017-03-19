@@ -265,7 +265,7 @@ def _get_donnies_exact_tweets():
 def select_new_tweets(num_selected=200):
     """Pick NUM_SELECTED new tweets from each tweet store at random, and save those
     tweets to the appropriate places for the web quiz to pick them up. This
-    function is never called automatically; it's just for maintenance work.
+    function is **never** called automatically; it's just for maintenance work.
     """
     save_tweets(random.sample(_get_our_exact_tweets(), num_selected), tu.our_minimal_tweets)
     save_tweets(random.sample(_get_donnies_exact_tweets(), num_selected), tu.donnies_minimal_tweets)

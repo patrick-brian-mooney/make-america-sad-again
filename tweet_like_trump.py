@@ -95,7 +95,7 @@ def validate_tweet(the_tweet):
 
         * length of tweet is not in range(20,141)
         * tweet is exactly the same as a tweet by The Donald.
-        * tweet is identical to a previous tweet by this account
+        * tweet is identical to a previous tweet by this account.
     """
     log_it("INFO: function validate_tweet() called", 3)
     if not len(the_tweet.strip()) in range(20, 141):
@@ -267,7 +267,6 @@ def combine_long_tweets(tweets_list):
         ret += [t]
     return ret
 
-
 def massage_tweets(the_tweets):
     """Make tweets The Donald more suitable for feeding into the Markov-chain,
     generator. Part of this involves silently dropping tweets that can't
@@ -308,19 +307,36 @@ def update_tweet_collection_if_necessary():
         update_tweet_collection()
 
 
+# This function builds the necessary Markov chains and generates an appropriate tweet.
+def do_tweet():
+    """Create and post a single tweet."""
+    tweet_files = tm.all_donnies_tweet_files()
+    first_file = tweet_files.pop()                  # De-emphasize the first file: it only contributes once to the word list.
+    donnies_words = sg.word_list_from_string(tm.get_tweet_archive_text(first_file))
+    for the_file in tweet_files:
+        donnies_words += sg.word_list_from_string(tm.get_tweet_archive_text(the_file)) * 3
+    starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
+    the_tweet = get_tweet(starts, the_mapping)
+    tweet(the_tweet)
+
+
 # The next group of functions handles user interaction via DMs and @mentions, and handles commands from me.
 def process_command(command, issuer_id):
     """Process a command coming from my own Twitter account."""
-    command_parts = [c.strip().lower() for c in command.strip().split() if not c.strip().startswith('@')]
-    if command_parts[0] in ['stop', 'quiet', 'silence']:
+    command_parts = [ c.strip().lower() for c in command.strip().split() if not '@' in c ]
+    if len(set(command_parts) & {'stop', 'quiet', 'silence'}):  # If set intersection is not zero-length, it includes one of these verbs
         tm.set_data_value('stopped', True)
         sm.send_DM(the_API=the_API, text='You got it, sir, halting tweets per your command.', user=issuer_id)
-    elif command_parts[0] in ['start', 'verbose', 'go', 'loud', 'begin']:
+    elif len(set(command_parts) & {'start', 'verbose', 'go', 'loud', 'begin'}):
         tm.set_data_value('stopped', False)
         sm.send_DM(the_API=the_API, text='Yessir, beginning tweeting again per your command.', user=issuer_id)
-    elif command_parts[0] in ['update', 'refresh', 'check', 'reload', 'new']:
+    elif len(set(command_parts) & {'update', 'refresh', 'check', 'reload', 'new'}):
         update_tweet_collection()
         sm.send_DM(the_API=the_API, text='You got it, sir: tweet collection updated.', user=issuer_id)
+    elif len(set(command_parts) & {'tweet', 'speak', 'declaim', 'proclaim', 'pontificate', 'now', 'tweetnow', 'gibberish'}):
+        do_tweet()
+        sm.send_DM(the_API=the_API, text="Yessir, just posted a tweet especially for you.", user=issuer_id)
+        # sys.exit(0)     # Avoid accidentally posting a second tweet.
     else:
         sm.send_DM(the_API=the_API, text="Sorry, sir. I didn't understand that.", user=issuer_id)
 
@@ -334,7 +350,7 @@ def handle_mention(mention):
         tm.set_data_value('last_mention_id', max(mention.id, get_newest_mention_id()))
         process_command(mention.text, issuer_id=tu.programmer_twitter_id)
     elif mention.user.screen_name.strip('@').lower().strip() == tu.target_twitter_id:
-        log_it("Oh my! The Donald is speaking! Click your jackboots together and salute!")
+        log_it("Oh my! The Donald is speaking! Click your jackboots together and salute!", -3)
         sm.modified_retweet('LOL\n\n', user_id=tu.target_twitter_id, tweet_id=mention.id)
     else:
         log_it('WARNING: unhandled mention from user @%s' % mention.user.screen_name)
@@ -388,16 +404,9 @@ if __name__ == '__main__':
         sys.exit(0)
 
     # @realDonaldTrump tweeted 200 times between 12/04/16 03:48 AM & 01/10/17 12:51 PM; that's approx. 5.3 tweets/day.
-    # If this script is called every fifteen minutes by a cron job, that's 96 times/day
+    # If this script is called every fifteen minutes by a cron job, that's 96 script invocations/day
     # That works out to needing to tweet on 5.57382532% of the script's invocations.
     if tu.force_tweet or random.random() <= 0.0557382532:
-        tweet_files = tm.all_donnies_tweet_files()
-        first_file = tweet_files.pop()                  # De-emphasize the first file.
-        donnies_words = sg.word_list_from_string(tm.get_tweet_archive_text(first_file))
-        for the_file in tweet_files:
-            donnies_words += sg.word_list_from_string(tm.get_tweet_archive_text(the_file)) * 3
-        starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
-        the_tweet = get_tweet(starts, the_mapping)
-        tweet(the_tweet)
+        do_tweet()
     else:
         log_it('INFO: not tweeting because dice roll failed')
