@@ -36,16 +36,9 @@ import trump_maint as tm
 patrick_logger.verbosity_level = 2  # As of 14 January 2017, 3 is the highest meaningful level for this script
 
 markov_length = 2
+daily_cron_invocations = 96         # This script gets run every 15 minutes
 
-def _get_new_API():
-    """Get an instance of the Tweepy API object to work with."""
-    auth = tweepy.OAuthHandler(Trump_client['consumer_key'], Trump_client['consumer_secret'])
-    auth.set_access_token(Trump_client['access_token'], Trump_client['access_token_secret'])
-    ret = tweepy.API(auth)
-    ret.wait_on_rate_limit, ret.wait_on_rate_limit_notify = True, True
-    return ret
-
-the_API = _get_new_API()
+the_API = sm.get_new_twitter_API(Trump_client)
 
 
 # Convenience functions to get specific data from the data store.
@@ -73,6 +66,19 @@ def get_newest_dm_id():
     if tm.get_key_value_with_default('last_dm_id', default=-1) < max(tm.get_id_set(tu.DMs_store)):
         tm.set_data_value('last_dm_id', max(tm.get_id_set(tu.DMs_store)))
     return tm.get_key_value_with_default('last_dm_id', default=-1)
+
+def get_tweet_probability():
+    """Returns a probability (between zero and one) that the script should tweet on a
+    particular invocation. E.g., if the script should tweet 18% of the times it is
+    called (which would actually be quite high), this function would return 0.18.
+    
+    #FIXME: Currently, this function has a fixed idea of how often it should tweet.
+    These numbers should be updated by update_tweet_collection(), but isn't yet.  
+    """
+    # @realDonaldTrump tweeted 200 times between 12/04/16 03:48 AM & 01/10/17 12:51 PM; that's approx. 5.3 tweets/day.
+    # If this script is called every fifteen minutes by a cron job, that's 96 script invocations/day.
+    # That works out to needing to tweet on 5.57382532% of the script's invocations; we'll use that as the basis for the default.
+    return tm.get_key_value_with_default('tweet_probability', default=0.0557382532)
 
 
 # This next group of functions handles the actual creation of tweets based on our stored copies of The Donald's tweets
@@ -103,7 +109,7 @@ def validate_tweet(the_tweet):
 
         * length of tweet is not in range(20,141)
         * tweet is exactly the same as a tweet by The Donald.
-        * tweet is identical to a previous tweet by this account
+        * tweet is identical to a previous tweet by this account.
     """
     log_it("INFO: function validate_tweet() called", 3)
     if not len(the_tweet.strip()) in range(20, 141):
@@ -137,7 +143,7 @@ def tweet(text, id=None, date=None):
     the script.
     """
     log_it("Tweet is: '%s'. Posting ..." % text)
-    the_status = sm.post_tweet(Trump_client, text)
+    the_status = sm.post_tweet(text, Trump_client)
 
     log_it("Adding that tweet to our tweet archive")
     with open(tu.tweets_store, mode='a', newline='') as archive_file:
@@ -153,6 +159,16 @@ def get_new_tweets(screen_name=tu.target_twitter_id, oldest=-1):
     """
     # get most recent tweets (200 is maximum possible at once)
     new_tweets = the_API.user_timeline(screen_name=screen_name, count=200)
+
+    # Before iterating over all available tweets, figure out how often The Donald has been tweeting lately.
+    # This is based on the elapsed time for the last two hundred tweets. 
+    # Then figure out the likelihood of tweeting on any particular run and store it.     
+    total_time = (new_tweets[0].created_at - new_tweets[-1].created_at).total_seconds()
+    total_days = total_time / (60 * 60 * 24)
+    tweets_per_day = len(new_tweets) / total_days
+    probability = tweets_per_day / daily_cron_invocations
+    tm.set_data_value('tweet_probability', probability)
+    
     ret = new_tweets.copy()
 
     oldest_tweet = ret[-1].id - 1  # save the id of the tweet before the oldest tweet
@@ -218,15 +234,10 @@ def normalize(the_tweet):
     """
     substitution_list = [['\n', ' '],                   # Newline to space
                          ['  ', ' '],                   # Two spaces to one space
-#                         ['U\.S\.A\.', 'U․S․A․'],       # Periods to one-dot leaders
                          ['U\. S\. A\.', 'U․S․A․'],     # Periods to one-dot leaders, remove spaces
                          ['U\. S\.', 'U․S․'],           # Periods to one-dot leaders, remove spaces
-#                         ['U\.S\.', 'U․S․'],            # Periods to one-dot leaders
-#                         ['P\.M\.', 'P․M․'],            # Again
                          ['p\.m\.', 'p․m․'],            # Again
-#                         ['A\.M\.', 'A․M․'],            # Again
                          ['a\.m\.', 'a․m․'],            # Again
-#                         ['V\.P\.', 'V․P․'],            # Again
                          ['Mr\.', 'Mr․'],               # Again
                          ['Dr\.', 'Dr․'],               # Again
                          ['Mrs\.', 'Mrs․'],             # Again
@@ -236,10 +247,10 @@ def normalize(the_tweet):
                          ['Sen\.', 'Sen․'],             # Again
                          ['Gov\.', 'Gov․'],             # Again
                          [' \n', '\n'],                 # Space-then-newline to newline
-                         ['\.\.\.\.', '...'],               # Four periods to three periods
-                         ['\.\.', '.'],                   # Two periods to one period
-                         ['\.\.\.', '…'],                  # Three periods to ellipsis
-                         ['…\.', '…'],                   # Ellipsis-period to ellipsis. …. may be allowable, but is unlikely for Donnie.
+                         ['\.\.\.\.', '...'],           # Four periods to three periods
+                         ['\.\.', '.'],                 # Two periods to one period
+                         ['\.\.\.', '…'],               # Three periods to ellipsis
+                         ['…\.', '…'],                  # Ellipsis-period to ellipsis. …. may be allowable, but is unlikely for Donnie.
                          ['……', '…'],                   # Double-ellipsis to ellipsis.
                          ['… …', '…'],                  # Double-ellipsis-with-space to ellipsis
                         ]
@@ -247,16 +258,52 @@ def normalize(the_tweet):
     the_tweet.text = th.multi_replace(html.unescape(th.multi_replace(the_tweet.text, substitution_list)),substitution_list)
     return the_tweet
 
+def combine_long_tweets(tweets_list):
+    """Takes a list of tweepy.Tweet objects and looks through them for tweets
+    beginning or ending with an ellipsis. If it finds one, it combines it
+    appropriately with an adjacent tweet and invalidates some other information
+    to signal that the tweet has been edited in this way.
+    """
+    ret = [][:]
+    tweets = tweets_list[:]     # Operate on a local copy.
+    while tweets:               # First, go through tweets, looking for tweets ending with an ellipsis
+        t = tweets.pop()        # Get a tweet, then pre-process it to normalize the form of ellipses.
+        t.text = th.multi_replace(t.text, [['\.\.\.\.', '...'], ['\.\.', '…'], ['\.\.\.', '…'], ['…\.', '…'],
+                                           ['……', '…'], ['… …', '…']
+                                          ]).strip()
+        while tweets and t.text.endswith('…'):  # Add to text of current tweet
+            new_t = tweets.pop()
+            new_t.text = th.multi_replace(new_t.text, [['\.\.\.\.', '...'], ['\.\.', '…'], ['\.\.\.', '…'],
+                                                       ['…\.', '…'], ['……', '…'], ['… …', '…']
+                                                      ]).strip()
+            t.text = "%s %s" % (t.text.rstrip().rstrip('…').rstrip(), new_t.text.lstrip().lstrip('…').lstrip())
+            t.text = t.text.strip()
+            t.id_str, t.created_at = "", ""     # Invalidate these params to signal we've modified the text.
+        ret += [t]
+    tweets, ret = ret[:], [][:]                 # Go through again, looking at the beginnings of tweets.
+    while tweets:                               # (The Donald is inconsistent in where he puts the ellipsis.)
+        t = tweets.pop()                        # At least we've already preprocessed ellipses.
+        while tweets and tweets[0].text.startswith('…'):    # If the next tweet on the stack begins with an ellipsis
+            new_t = tweets.pop()
+            t.text = "%s %s" % (t.text.rstrip().rstrip('…').rstrip(), new_t.text.lstrip().lstrip('…').lstrip())
+            t.text = t.text.strip()
+            t.id_str, t.created_at = "", ""
+        ret += [t]
+    return ret
+
 def massage_tweets(the_tweets):
     """Make tweets The Donald more suitable for feeding into the Markov-chain,
     generator. Part of this involves silently dropping tweets that can't
     effectively be used by the Markov chain-based generator; once this is done,
     the remaining tweets are passed through normalize() to smooth out (some of)
     their remaining rough edges.
+
+    THE_TWEETS is a list of tweepy.Tweet objects.
     """
+    the_tweets = combine_long_tweets(the_tweets)
     return [normalize(t) for t in the_tweets if not filter_tweet(t.text)]
 
-def save_tweets(the_tweets):
+def save_donnies_tweets(the_tweets):
     """Save the text from THE_TWEETS to a CSV file, and update the stored data.
     THE_TWEETS is a list of tweepy.Tweet objects, not strings.
 
@@ -265,10 +312,7 @@ def save_tweets(the_tweets):
     """
     if len(the_tweets) == 0:  # If there are no new tweets, don't do anything
         return
-    with open('%s/%s.csv' % (tu.donnies_tweets_dir, datetime.datetime.now().isoformat()), 'w', newline="") as f:
-        csvwriter = csv.writer(f, dialect='unix')
-        for t in the_tweets:
-            csvwriter.writerow([t.text, t.id_str, t.created_at])
+    tm.save_tweets([[t.text, t.id_str, t.created_at] for t in the_tweets], '%s/%s.csv' % (tu.donnies_tweets_dir, datetime.datetime.now().isoformat()))
     tm.set_data_value('last_update_date', datetime.datetime.now())  # then, update the database of tweet-record filenames and ID numbers
 
 def update_tweet_collection():
@@ -276,7 +320,7 @@ def update_tweet_collection():
     log_it("INFO: updating tweet collection")
     t = get_new_tweets(screen_name=tu.target_twitter_id, oldest=get_newest_tweet_id())
     t = massage_tweets(t)
-    save_tweets(t)
+    save_donnies_tweets(t)
     tm.export_plaintext_tweets()    # Make sure that an up-to-date export is there for applications that consume it.
 
 def update_tweet_collection_if_necessary():
@@ -287,19 +331,36 @@ def update_tweet_collection_if_necessary():
         update_tweet_collection()
 
 
+# This function builds the necessary Markov chains and generates an appropriate tweet.
+def do_tweet():
+    """Create and post a single tweet."""
+    tweet_files = tm.all_donnies_tweet_files()
+    first_file = tweet_files.pop()                  # De-emphasize the first file: it only contributes once to the word list.
+    donnies_words = sg.word_list_from_string(tm.get_tweet_archive_text(first_file))
+    for the_file in tweet_files:
+        donnies_words += sg.word_list_from_string(tm.get_tweet_archive_text(the_file)) * 3
+    starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
+    the_tweet = get_tweet(starts, the_mapping)
+    tweet(the_tweet)
+
+
 # The next group of functions handles user interaction via DMs and @mentions, and handles commands from me.
 def process_command(command, issuer_id):
     """Process a command coming from my own Twitter account."""
-    command_parts = [c.strip().lower() for c in command.strip().split() if not c.strip().startswith('@')]
-    if command_parts[0] in ['stop', 'quiet', 'silence']:
+    command_parts = [ c.strip().lower() for c in command.strip().split() if not '@' in c ]
+    if len(set(command_parts) & {'stop', 'quiet', 'silence'}):  # If set intersection is not zero-length, it includes one of these verbs
         tm.set_data_value('stopped', True)
         sm.send_DM(the_API=the_API, text='You got it, sir, halting tweets per your command.', user=issuer_id)
-    elif command_parts[0] in ['start', 'verbose', 'go', 'loud', 'begin']:
+    elif len(set(command_parts) & {'start', 'verbose', 'go', 'loud', 'begin'}):
         tm.set_data_value('stopped', False)
         sm.send_DM(the_API=the_API, text='Yessir, beginning tweeting again per your command.', user=issuer_id)
-    elif command_parts[0] in ['update', 'refresh', 'check', 'reload', 'new']:
+    elif len(set(command_parts) & {'update', 'refresh', 'check', 'reload', 'new'}):
         update_tweet_collection()
         sm.send_DM(the_API=the_API, text='You got it, sir: tweet collection updated.', user=issuer_id)
+    elif len(set(command_parts) & {'tweet', 'speak', 'declaim', 'proclaim', 'pontificate', 'now', 'tweetnow', 'gibberish'}):
+        do_tweet()
+        sm.send_DM(the_API=the_API, text="Yessir, just posted a tweet especially for you.", user=issuer_id)
+        # sys.exit(0)     # Avoid accidentally posting a second tweet.
     else:
         sm.send_DM(the_API=the_API, text="Sorry, sir. I didn't understand that.", user=issuer_id)
 
@@ -313,7 +374,7 @@ def handle_mention(mention):
         tm.set_data_value('last_mention_id', max(mention.id, get_newest_mention_id()))
         process_command(mention.text, issuer_id=tu.programmer_twitter_id)
     elif mention.user.screen_name.strip('@').lower().strip() == tu.target_twitter_id:
-        log_it("Oh my! The Donald is speaking! Click your jackboots together and salute!")
+        log_it("Oh my! The Donald is speaking! Click your jackboots together and salute!", -3)
         sm.modified_retweet('LOL\n\n', user_id=tu.target_twitter_id, tweet_id=mention.id)
     else:
         log_it('WARNING: unhandled mention from user @%s' % mention.user.screen_name)
@@ -323,8 +384,9 @@ def handle_mention(mention):
 
 def check_mentions():
     """A stub to check for any @mentions and, if necessary, reply to them."""
-    for mention in [m for m in tm._get_all_mentions(the_API=the_API) if m.id > get_newest_mention_id()]:
-        handle_mention(mention)
+    for mention in [m for m in tm.get_all_mentions(the_API=the_API) if m.id > get_newest_mention_id()]:
+        if not tm.seen_mention(mention.id):
+            handle_mention(mention)
 
 def handle_dm(direct_message):
     """Handle a given direct message. Currently, it just treats any DM from me as a
@@ -347,7 +409,7 @@ def handle_dm(direct_message):
 
 def check_DMs():
     """Check and handle any direct messages."""
-    for dm in [dm for dm in tm._get_all_DMs(lowest_id=get_newest_dm_id(), the_API=the_API) if not tm.seen_DM(dm.id)]:
+    for dm in [dm for dm in tm.get_all_DMs(lowest_id=get_newest_dm_id(), the_API=the_API) if not tm.seen_DM(dm.id)]:
         handle_dm(dm)
 
 def set_up():
@@ -365,15 +427,7 @@ if __name__ == '__main__':
         log_it('Aborting: user data key "stopped" is set.')
         sys.exit(0)
 
-    # @realDonaldTrump tweeted 200 times between 12/04/16 03:48 AM & 01/10/17 12:51 PM; that's approx. 5.3 tweets/day.
-    # If this script is called every fifteen minutes by a cron job, that's 96 times/day
-    # That works out to needing to tweet on 5.57382532% of the script's invocations.
-    if tu.force_tweet or random.random() <= 0.0557382532:
-        donnies_words = [][:]
-        for the_file in tm._all_donnies_tweet_files():
-            donnies_words += sg.word_list_from_string(tm._get_tweet_archive_text(the_file))
-        starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
-        the_tweet = get_tweet(starts, the_mapping)
-        tweet(the_tweet)
+    if tu.force_tweet or random.random() <= get_tweet_probability():
+        do_tweet()
     else:
         log_it('INFO: not tweeting because dice roll failed')
