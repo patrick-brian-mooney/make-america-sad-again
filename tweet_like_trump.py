@@ -36,6 +36,7 @@ import trump_maint as tm
 patrick_logger.verbosity_level = 2  # As of 14 January 2017, 3 is the highest meaningful level for this script
 
 markov_length = 2
+daily_cron_invocations = 96         # This script gets run every 15 minutes
 
 the_API = sm.get_new_twitter_API(Trump_client)
 
@@ -65,6 +66,19 @@ def get_newest_dm_id():
     if tm.get_key_value_with_default('last_dm_id', default=-1) < max(tm.get_id_set(tu.DMs_store)):
         tm.set_data_value('last_dm_id', max(tm.get_id_set(tu.DMs_store)))
     return tm.get_key_value_with_default('last_dm_id', default=-1)
+
+def get_tweet_probability():
+    """Returns a probability (between zero and one) that the script should tweet on a
+    particular invocation. E.g., if the script should tweet 18% of the times it is
+    called (which would actually be quite high), this function would return 0.18.
+    
+    #FIXME: Currently, this function has a fixed idea of how often it should tweet.
+    These numbers should be updated by update_tweet_collection(), but isn't yet.  
+    """
+    # @realDonaldTrump tweeted 200 times between 12/04/16 03:48 AM & 01/10/17 12:51 PM; that's approx. 5.3 tweets/day.
+    # If this script is called every fifteen minutes by a cron job, that's 96 script invocations/day.
+    # That works out to needing to tweet on 5.57382532% of the script's invocations; we'll use that as the basis for the default.
+    return tm.get_key_value_with_default('tweet_probability', default=0.0557382532)
 
 
 # This next group of functions handles the actual creation of tweets based on our stored copies of The Donald's tweets
@@ -145,6 +159,16 @@ def get_new_tweets(screen_name=tu.target_twitter_id, oldest=-1):
     """
     # get most recent tweets (200 is maximum possible at once)
     new_tweets = the_API.user_timeline(screen_name=screen_name, count=200)
+
+    # Before iterating over all available tweets, figure out how often The Donald has been tweeting lately.
+    # This is based on the elapsed time for the last two hundred tweets. 
+    # Then figure out the likelihood of tweeting on any particular run and store it.     
+    total_time = (new_tweets[0].created_at - new_tweets[-1].created_at).total_seconds()
+    total_days = total_time / (60 * 60 * 24)
+    tweets_per_day = len(new_tweets) / total_days
+    probability = tweets_per_day / daily_cron_invocations
+    tm.set_data_value('tweet_probability', probability)
+    
     ret = new_tweets.copy()
 
     oldest_tweet = ret[-1].id - 1  # save the id of the tweet before the oldest tweet
@@ -403,10 +427,7 @@ if __name__ == '__main__':
         log_it('Aborting: user data key "stopped" is set.')
         sys.exit(0)
 
-    # @realDonaldTrump tweeted 200 times between 12/04/16 03:48 AM & 01/10/17 12:51 PM; that's approx. 5.3 tweets/day.
-    # If this script is called every fifteen minutes by a cron job, that's 96 script invocations/day
-    # That works out to needing to tweet on 5.57382532% of the script's invocations.
-    if tu.force_tweet or random.random() <= 0.0557382532:
+    if tu.force_tweet or random.random() <= get_tweet_probability():
         do_tweet()
     else:
         log_it('INFO: not tweeting because dice roll failed')
