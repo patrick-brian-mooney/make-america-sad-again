@@ -88,8 +88,7 @@ def bump_count(which_key):
     for which_key in the_stats:
         writer.writerow([which_key, the_stats[which_key]])
     stats_file.close()          # I take it we don't need to separately close the file descriptor.
-    
-    
+
 
 if __name__ == "__main__":
     import trump_maint as tm

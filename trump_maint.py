@@ -203,8 +203,8 @@ def get_tweet_archive_text(archive_file):
     :return: a string containing the archive of all of our tweets.
     """
     with open(archive_file, newline='') as csvfile:
-        csvreader =     csv.reader(csvfile, dialect='unix')
-        return '\n'.join([row[0] for row in csvreader])
+        csvreader = csv.reader(csvfile, dialect='unix')
+        return '\n'.join([row[0] for row in csvreader if len(row) > 0])
 
 def get_our_tweet_text():
     """ Returns the full text of all tweets this script has created and stored.
@@ -249,7 +249,7 @@ def _get_all_exact_tweets(archive_file):
     """
     with open(archive_file, newline='') as csvfile:
         csvreader = csv.reader(csvfile, dialect='unix')
-        return [item for item in csvreader if item[1] and item[2]]  # Filter out empty IDs and empty timestamps
+        return [item for item in csvreader if len(item) == 3 and item[1] and item[2]]  # Filter out empty IDs and empty timestamps
 
 def _get_our_exact_tweets():
     """Returns a list -- [tweet text, tweet ID, tweet date] -- of all our tweets."""
@@ -281,10 +281,11 @@ def _plaintext_export(filename, getter):
         export_file.write(getter())
 
 def export_plaintext_tweets():
-    """Produce plaintext versions of the tweet stores, so they
+    """Produce plaintext versions of the tweet stores, so they can be read easily
+    by other applications.
     """
     _plaintext_export(tu.donnie_plaintext_tweets, get_donnies_tweet_text)
     _plaintext_export(tu.our_plaintext_tweets, get_our_tweet_text)
 
 if __name__ == "__main__":
-    pass
+    select_new_tweets(400)
