@@ -6,7 +6,13 @@ print("Content-Type: text/html; charset=utf-8\n\n")
 import sys
 sys.stderr = sys.stdout
 
-import trump_utils as tu
+import csv
+
+def get_stats_dictionary():
+    with open('stats/stats.csv') as stats_file:
+        reader = csv.reader(stats_file)
+        the_stats = {rows[0]:int(rows[1]) for rows in reader}
+    return the_stats
 
 print("""<!doctype html>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
@@ -26,22 +32,22 @@ print("""<!doctype html>
 <title>Stats for Did Donnie Say It?</title>
 <meta name="generator" content="Bluefish 2.2.6" />
 <meta name="author" content="Patrick Mooney" />
-<meta name="dcterms.rights" content="Copyright © 2016&ndash;17 Patrick Mooney" />
-<meta name="description" content="Can Donald Trump pass a crowdsourced Turing test?" />
+<meta name="dcterms.rights" content="Copyright © 2016 Patrick Mooney" />
+<meta name="description" content="Did Donald Trump say it on Twitter? Or was it a robot that mindlessly imitates Donald Trump?" />
 <meta name="rating" content="general" />
 <meta name="revisit-after" content="3 days" />
-<meta name="date" content="2017-01-27T13:04:10-0800" />
+<meta name="date" content="2017-03-20T04:15:04-0700" />
 <meta property="fb:admins" content="100006098197123" />
 <meta property="og:title" content="Stats for Did Donnie Say It?" />
 <meta property="og:type" content="website" />
-<meta property="og:url" content="http://patrickbrianmooney.nfshost.com/~patrick/projects/TrumpQuiz/" />
+<meta property="og:url" content="http://patrickbrianmooney.nfshost.com/~patrick/projects/TrumpQuiz/stats.cgi" />
 <meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/a/a7/Donald_Trump_March_2015.jpg" />
-<meta property="og:description" content="Can Donald Trump pass a crowdsourced Turing test?" />
+<meta property="og:description" content="Did Donald Trump say it on Twitter? Or was it a robot that mindlessly imitates Donald Trump?" />
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:site" content="@false_trump" />
 <meta name="twitter:creator" content="@patrick_mooney" />
 <meta name="twitter:title" content="Stats for Did Donnie Say It?" />
-<meta name="twitter:description" content="Can Donald Trump pass a crowdsourced Turing test?" />
+<meta name="twitter:description" content="Did Donald Trump say it on Twitter? Or was it a robot that mindlessly imitates Donald Trump?" />
 <meta name="twitter:image:src" content="https://upload.wikimedia.org/wikipedia/commons/a/a7/Donald_Trump_March_2015.jpg" />
 </head>
 
@@ -69,7 +75,7 @@ var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga
 </script>
 <h1>Stats for Did Donnie Say It?</h1>""")
 
-tdata = tu.get_stats_dictionary()
+tdata = get_stats_dictionary()
 
 times_taken = sum(tdata.values())
 
@@ -93,12 +99,12 @@ print("""    <tr><td>&nbsp;</td><th scope="row">Totals</th><td><span class="line
 
 print("""
 
-<p>You can download the raw data <a rel="me" href="stats.csv">here</a>, if you'd like.</p>
+<p>You can download the raw data <a rel="me" href="stats/stats.csv">here</a>, if you'd like.</p>
 
 <p><a rel="me" href="index.cgi">Back to <q>Did Donnie Say It?</q></a></p>
 
 <footer class="status vevent">
-<p>This quiz has a <a rel="me" href="privacy.html">privacy policy</a> that you can read if you want. <a rel="me author" class="url location" href="#">This web page</a> is copyright © 2016 by <span class="fn">Patrick Mooney</span>. <abbr class="summary description" title="Stats explanation for 'Did Donnie Say It?' last updated">Last update to this HTML file</abbr>: <abbr class="dtstart" title="2017-01-27">27 January 2017</abbr>.</p>
+<p>This quiz has a <a rel="me" href="privacy.html">privacy policy</a> that you can read if you want. <a rel="me author" class="url location" href="#">This web page</a> is copyright © 2016 by <span class="fn">Patrick Mooney</span>. <abbr class="summary description" title="Stats explanation for 'Did Donnie Say It?' last updated">Last update to this HTML file</abbr>: <abbr class="dtstart" title="2016-04-28">28 April 2016</abbr>.</p>
 </footer>
 </div></body>
 </html>""")
