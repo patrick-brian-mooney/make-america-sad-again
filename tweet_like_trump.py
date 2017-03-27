@@ -283,7 +283,7 @@ def combine_long_tweets(tweets_list):
     tweets, ret = ret[:], [][:]                 # Go through again, looking at the beginnings of tweets.
     while tweets:                               # (The Donald is inconsistent in where he puts the ellipsis.)
         t = tweets.pop()                        # At least we've already preprocessed ellipses.
-        while tweets and tweets[0].text.startswith('…'):    # If the next tweet on the stack begins with an ellipsis
+        while tweets and tweets[0].text.startswith('…'):    # If the next tweet on the stack begins with an ellipsis ...
             new_t = tweets.pop()
             t.text = "%s %s" % (t.text.rstrip().rstrip('…').rstrip(), new_t.text.lstrip().lstrip('…').lstrip())
             t.text = t.text.strip()
@@ -292,7 +292,7 @@ def combine_long_tweets(tweets_list):
     return ret
 
 def massage_tweets(the_tweets):
-    """Make tweets The Donald more suitable for feeding into the Markov-chain,
+    """Make tweets from The Donald more suitable for feeding into the Markov-chain
     generator. Part of this involves silently dropping tweets that can't
     effectively be used by the Markov chain-based generator; once this is done,
     the remaining tweets are passed through normalize() to smooth out (some of)
@@ -327,7 +327,7 @@ def update_tweet_collection_if_necessary():
     """Once in a while, import new tweets encoding the brilliance that The Donald &
     his team have graced the world by sharing.
     """
-    if tu.force_download or tm._num_tweet_files() == 0 or (datetime.datetime.now()-get_last_update_date()).days > 30 or random.random() < 0.01:
+    if tu.force_download or tm._num_tweet_files() == 0 or (datetime.datetime.now()-get_last_update_date()).days > 30 or random.random() < 0.001:
         update_tweet_collection()
 
 
