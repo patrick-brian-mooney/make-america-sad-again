@@ -19,7 +19,7 @@ DMs_store = '%s/seen_DMs.pkl' % data_dir
 mentions_store = '%s/seen_mentions.pkl' % data_dir
 donnies_tweets_dir = "%s/donnies_tweets" % data_dir
 
-our_minimal_tweets = '/~patrick/projects/TrumpQuiz/false_trump.csv'     # Where to export our selected tweets for the web quiz: local folder 
+our_minimal_tweets = '/~patrick/projects/TrumpQuiz/false_trump.csv'     # Where to export our selected tweets for the web quiz: local folder
 donnies_minimal_tweets = '/~patrick/projects/TrumpQuiz/trump.csv'       # same, for selected tweets of Trump.
 
 answer_counts = '/~patrick/projects/TrumpQuiz/stats.csv'                # Location of file to store the answer count statistics.
@@ -34,27 +34,37 @@ my_twitter_id = 'false_trump'  # That's the Twitter username under which the scr
 
 # Miscellaneous convenience functions
 def get_tweet_url(account, id):
-    """Given a tweet ID and the name of the associated ACCOUNT, generate a URL for
-    a tweet.
+    """Convenience function to generate a URL for a tweet.
+
+    :param account: the username of the account from the tweet.
+    :param id: ID of the tweet in question.
+    :return: a string representing the complete URL for the tweet.
     """
     return "https://twitter.com/%s/status/%s" % (account, id)
 
 # This function is responsible for picking a tweet at random from a specified archive of tweets.
 def get_random_tweet(source_file):
-    """Get a random tweet from the .csv archive whose path is passed in as
-    SOURCE_FILE.
+    """Get a random tweet from a tweet archive file.
+
+    :param source_file: the path to a tweet-archive .csv file.
+    :return: a dictionary representing essential information about the randomly
+        selected tweet: tweet text, id, and date.
     """
     with open(source_file, newline='') as the_archive:
         csvreader = csv.reader(the_archive, dialect='unix')
         return dict(zip(['text', 'id', 'date' ], random.choice(list(csvreader))))
 
 
-# This next group of functions maintains 
+# This next group of functions maintains the statistics about user guesses for the web quiz.
 def _create_stats_file():
-    """For the sake of being explicit:
+    """Creates a new file tracking right and wrong user answers
+
+    :return: None.
+
+    For the sake of being explicit:
       trump_right means USER CORRECTLY IDENTIFIED A QUOTE AS COMING FROM DONALD TRUMP
       trump_wrong means USER SAID IT WAS FROM DONALD TRUMP, BUT THAT WAS WRONG
-    
+
     Same for algorithm_right and algorithm_wrong.
     """
     empty_counts = {
@@ -68,12 +78,22 @@ def _create_stats_file():
             writer.writerow([which_key, empty_counts[which_key]])
 
 def get_stats_dictionary():
-    """Returns a dictionary recording guess counts."""
+    """Reads the dictionary of guess statistics.
+
+    :return: a dictionary, as specified in empty_counts in _create_stats_file(),
+        but with actual count numbers instead of zeros.
+    """
     with open(answer_counts, newline='') as stats_file:
         return {rows[0]:int(rows[1]) for rows in csv.reader(stats_file)}
 
 def bump_count(which_key):
-    """Increases the count of """
+    """Increases the count of a specified key. Only one invocation of the script
+    can be doing this at once; in theory, if multiple calls are being made to this
+    function at once, this function should block until the file becomes available.
+
+    :param which_key: the key name whose count should be bumped up.
+    :return: None.
+    """
     try:
         fd_file = os.open(answer_counts, (os.O_RDWR | os.O_EXCL))
     except FileNotFoundError:
