@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""A script to download Donald Trump's recent tweets and filter them in ways that
-create a textual archive suitable for using for my Make America Sad! Again
-Twitter parody account. It maintains a list of tweets it has seen after
-massaging them and posts tweets to the MAS!A account; it also has some limited
-abilities to engage in interactions with other accounts.
+"""A script that attempts to create tweets that are "similar to" Donald Trump's.
+In order to do this, it downloads Trump's recent tweets and filters them in
+ways that create a textual archive suitable for training my Markov chain-based
+sentence generator. It maintains a list of tweets it has seen after massaging
+them and posts tweets to the Make America Sad! Again account; it also has some
+limited abilities to engage in interactions with other accounts.
 
 This script is PRE-ALPHA SOFTWARE, and certainly contains many defects, some of
 which may be serious. The author accepts no liability for the effects of running
@@ -36,7 +37,7 @@ import trump_maint as tm
 patrick_logger.verbosity_level = 2  # As of 14 January 2017, 3 is the highest meaningful level for this script
 
 markov_length = 2
-daily_cron_invocations = 96         # This script gets run every 15 minutes
+daily_cron_invocations = 96         # This script gets run every 15 minutes. It needs to know this to calculate the # probability that it should post on a particular run.
 
 the_API = sm.get_new_twitter_API(Trump_client)
 
@@ -71,9 +72,6 @@ def get_tweet_probability():
     """Returns a probability (between zero and one) that the script should tweet on a
     particular invocation. E.g., if the script should tweet 18% of the times it is
     called (which would actually be quite high), this function would return 0.18.
-    
-    #FIXME: Currently, this function has a fixed idea of how often it should tweet.
-    These numbers should be updated by update_tweet_collection(), but isn't yet.  
     """
     # @realDonaldTrump tweeted 200 times between 12/04/16 03:48 AM & 01/10/17 12:51 PM; that's approx. 5.3 tweets/day.
     # If this script is called every fifteen minutes by a cron job, that's 96 script invocations/day.
@@ -107,7 +105,7 @@ def validate_tweet(the_tweet):
     Currently, the function approves all tweets, unless they meet any of the
     following criteria:
 
-        * length of tweet is not in range(20,141)
+        * length of tweet is not in the range [20,141)
         * tweet is exactly the same as a tweet by The Donald.
         * tweet is identical to a previous tweet by this account.
     """
@@ -161,14 +159,14 @@ def get_new_tweets(screen_name=tu.target_twitter_id, oldest=-1):
     new_tweets = the_API.user_timeline(screen_name=screen_name, count=200)
 
     # Before iterating over all available tweets, figure out how often The Donald has been tweeting lately.
-    # This is based on the elapsed time for the last two hundred tweets. 
-    # Then figure out the likelihood of tweeting on any particular run and store it.     
+    # This is based on the elapsed time for the last two hundred tweets.
+    # Then figure out the likelihood of tweeting on any particular run and store it.
     total_time = (new_tweets[0].created_at - new_tweets[-1].created_at).total_seconds()
     total_days = total_time / (60 * 60 * 24)
     tweets_per_day = len(new_tweets) / total_days
     probability = tweets_per_day / daily_cron_invocations
     tm.set_data_value('tweet_probability', probability)
-    
+
     ret = new_tweets.copy()
 
     oldest_tweet = ret[-1].id - 1  # save the id of the tweet before the oldest tweet
