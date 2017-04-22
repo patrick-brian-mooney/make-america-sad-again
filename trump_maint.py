@@ -257,7 +257,7 @@ def seen_mention(message_id):
 #       [ tweet text, tweet ID, tweet date ]
 def all_donnies_tweet_files():
     """Convenience function to return a list of all files The Donald's tweets are
-    stored in.
+    stored in. This list is sorted (by filename).
 
     :return: a list of these files.
     """

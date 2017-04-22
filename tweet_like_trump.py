@@ -122,16 +122,23 @@ def validate_tweet(the_tweet):
     log_it('INFO: approving tweet "%s".' % the_tweet, 3)
     return True
 
-def get_tweet(starts, the_mapping):
+def get_tweet():
     """Produces a tweet by repeatedly calling the text generator with varying
     parameters until it just so happens that it coughs up something that
     validate_tweet() approves of.
     """
+    genny = sg.TextGenerator()
+    tweet_files = tm.all_donnies_tweet_files()
+    first_file = tweet_files.pop()                  # De-emphasize the first file: it only contributes to the word list once.
+    donnies_words = tm.get_tweet_archive_text(first_file)
+    for the_file in tweet_files:
+        donnies_words = donnies_words + tm.get_tweet_archive_text(the_file) * 3
+    genny._train_from_text(donnies_words, markov_length=markov_length)
     got_tweet = False
     while not got_tweet:
         sents = random.choice(range(1, 5))
         log_it("Generating a tweet (%d sentences) ..." % sents)
-        the_tweet = sg.gen_text(the_mapping, starts, markov_length=markov_length, sentences_desired=sents, paragraph_break_probability=0.1).strip()
+        the_tweet = genny.gen_text(sentences_desired=sents, paragraph_break_probability=0.1).strip()
         got_tweet = validate_tweet(the_tweet)
         log_it("    ... length is %d" % len(the_tweet))
     return the_tweet
@@ -332,14 +339,7 @@ def update_tweet_collection_if_necessary():
 # This function builds the necessary Markov chains and generates an appropriate tweet.
 def do_tweet():
     """Create and post a single tweet."""
-    tweet_files = tm.all_donnies_tweet_files()
-    first_file = tweet_files.pop()                  # De-emphasize the first file: it only contributes once to the word list.
-    donnies_words = sg.word_list_from_string(tm.get_tweet_archive_text(first_file))
-    for the_file in tweet_files:
-        donnies_words += sg.word_list_from_string(tm.get_tweet_archive_text(the_file)) * 3
-    starts, the_mapping = sg.buildMapping(donnies_words, markov_length=markov_length)
-    the_tweet = get_tweet(starts, the_mapping)
-    tweet(the_tweet)
+    tweet(get_tweet())
 
 
 # The next group of functions handles user interaction via DMs and @mentions, and handles commands from me.
