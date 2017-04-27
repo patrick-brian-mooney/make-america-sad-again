@@ -25,7 +25,7 @@ from social_media_auth import Trump_client
 # That's an unshared file that contains my authentication constants for various social media platforms.
 
 import social_media as sm           # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/social_media.py
-import sentence_generator as sg     # https://github.com/patrick-brian-mooney/markov-sentence-generator
+import text_generator as tg         # https://github.com/patrick-brian-mooney/markov-sentence-generator
 import text_handling as th          # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/text_handling.py
 import patrick_logger               # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/patrick_logger.py
 from patrick_logger import log_it
@@ -127,7 +127,7 @@ def get_tweet():
     parameters until it just so happens that it coughs up something that
     validate_tweet() approves of.
     """
-    genny = sg.TextGenerator()
+    genny = tg.TextGenerator()
     tweet_files = tm.all_donnies_tweet_files()
     first_file = tweet_files.pop()                  # De-emphasize the first file: it only contributes to the word list once.
     donnies_words = tm.get_tweet_archive_text(first_file)
@@ -259,7 +259,7 @@ def normalize(the_tweet):
                          ['……', '…'],                   # Double-ellipsis to ellipsis.
                          ['… …', '…'],                  # Double-ellipsis-with-space to ellipsis
                         ]
-    the_tweet.text = sg.process_acronyms(the_tweet.text)
+    the_tweet.text = tg.process_acronyms(the_tweet.text)
     the_tweet.text = th.multi_replace(html.unescape(th.multi_replace(the_tweet.text, substitution_list)),substitution_list)
     return the_tweet
 
