@@ -19,7 +19,7 @@ print("""<!doctype html>
 <head>
 <link rel="stylesheet" type="text/css" href="http://patrickbrianmooney.nfshost.com/~patrick/css/skeleton-normalize.css" />
 <link rel="stylesheet" type="text/css" href="http://patrickbrianmooney.nfshost.com/~patrick/css/skeleton.css" />
-<link rel="stylesheet" type="text/css" href="http://patrickbrianmooney.nfshost.com/~patrick/css/content-skel.css" />
+<link rel="stylesheet" type="text/css" href="http://patrickbrianmooney.nfshost.com/~patrick/css/content.css" />
 <link rel="pgpkey" type="application/pgp-keys" href="/~patrick/505AB18E-public.asc" />
 <link rel="author" href="http://plus.google.com/109251121115002208129?rel=author" />
 <link rel="sitemap" href="/sitemap.xml" />
@@ -30,13 +30,13 @@ print("""<!doctype html>
 <link rel="profile" href="http://gmpg.org/xfn/11" />
 <link rel="icon" type="image/x-icon" href="/~patrick/icons/favicon.ico" />
 <title>Stats for Did Donnie Say It?</title>
-<meta name="generator" content="Bluefish 2.2.6" />
+<meta name="generator" content="Bluefish 2.2.9" />
 <meta name="author" content="Patrick Mooney" />
 <meta name="dcterms.rights" content="Copyright © 2016 Patrick Mooney" />
 <meta name="description" content="Did Donald Trump say it on Twitter? Or was it a robot that mindlessly imitates Donald Trump?" />
 <meta name="rating" content="general" />
 <meta name="revisit-after" content="3 days" />
-<meta name="date" content="2017-03-20T04:15:04-0700" />
+<meta name="date" content="2017-10-25T05:07:48-0700" />
 <meta property="fb:admins" content="100006098197123" />
 <meta property="og:title" content="Stats for Did Donnie Say It?" />
 <meta property="og:type" content="website" />
