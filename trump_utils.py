@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Shared constants and utilities for various scripts that handle interacting with
-the @false_trump account on Twitter, including those accessible to its
-web page.
+the @false_trump account on Twitter, including those accessible to its web
+page.
 """
 
 import glob, datetime, pickle, csv, random, os
 
 
 force_download = False      # Set to True to always check for new tweets from Trump .
-force_tweet = False         # Skip the dice roll; definitely post a new tweet every time the script runs.
+force_tweet = True         # Skip the dice roll; definitely post a new tweet every time the script runs.
 
 base_dir = '/TrumpTweets'
 data_dir = '%s/data' % base_dir

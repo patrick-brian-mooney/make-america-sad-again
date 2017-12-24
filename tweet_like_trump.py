@@ -34,7 +34,7 @@ import trump_utils as tu
 import trump_maint as tm
 
 
-patrick_logger.verbosity_level = 2  # As of 14 January 2017, 3 is the highest meaningful level for this script
+patrick_logger.verbosity_level = 3  # As of 14 January 2017, 3 is the highest meaningful level for this script
 
 markov_length = 2
 daily_cron_invocations = 96         # This script gets run every 15 minutes. It needs to know this to calculate the # probability that it should post on a particular run.
@@ -105,12 +105,12 @@ def validate_tweet(the_tweet):
     Currently, the function approves all tweets, unless they meet any of the
     following criteria:
 
-        * length of tweet is not in the range [20,141)
+        * length of tweet is not in the range [20,281)
         * tweet is exactly the same as a tweet by The Donald.
         * tweet is identical to a previous tweet by this account.
     """
     log_it("INFO: function validate_tweet() called", 3)
-    if not len(the_tweet.strip()) in range(20, 141):
+    if not len(the_tweet.strip()) in range(20, 281):
         log_it('INFO; rejecting tweet "%s" because its length is %d' % (the_tweet, len(the_tweet.strip())), 3)
         return False
     if did_donnie_say_it(the_tweet):
