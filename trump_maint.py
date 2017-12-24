@@ -60,6 +60,7 @@ def set_data_value(keyname, value):
     access the store: there should never be any. (tweet_like_trump.py should be
     the only process accessing the file, and there should only be one
     invocation running at a time.)
+
     :param keyname: the keyname of the item to store in the data store.
     :param value: what value to store in that keyname.
     :return: None.
