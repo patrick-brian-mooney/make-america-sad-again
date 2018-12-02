@@ -190,7 +190,13 @@ def get_all_DMs(the_API, lowest_id=-1):
         than the ID of the lower bound of DMs to return.
     :return: a set of IDs of all DMs we've ever seen.
     """
-    return [dm for dm in _get_all_messages(lambda: the_API.direct_messages(count=100, full_text=True, since_id=lowest_id))]
+    ret = [][:]
+    try:
+        for dm in _get_all_messages(lambda: the_API.direct_messages(count=100, full_text=True, since_id=lowest_id)):
+            ret += [dm]
+    except BaseException as err:
+        log_it("ERROR: Can't get a list of DMs; the system said: %s" % err)
+    return ret
 
 def get_all_mentions(the_API):
     """ Get, from Twitter, a list of all @mentions, ever, whether we've seen them or not.
@@ -198,7 +204,13 @@ def get_all_mentions(the_API):
     :param the_API: An initialized Tweepy API object, THE_API, on which to operate.
     :return: a list of elements of type tweepy.Tweet.
     """
-    return [m for m in _get_all_messages(lambda: the_API.mentions_timeline(count=100))]
+    ret = [][:]
+    for m in _get_all_messages(lambda: the_API.mentions_timeline(count=100)):
+        try:
+            ret += [m]
+        except BaseException as err:
+            pass
+    return ret
 
 def _learn_all_DMs():
     """Gets a list of all the DMs that have ever been sent, and add them to the list

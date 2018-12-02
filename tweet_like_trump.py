@@ -407,7 +407,9 @@ def handle_dm(direct_message):
 
 def check_DMs():
     """Check and handle any direct messages."""
-    for dm in [dm for dm in tm.get_all_DMs(lowest_id=get_newest_dm_id(), the_API=the_API) if not tm.seen_DM(dm.id)]:
+    all_DMs = tm.get_all_DMs(lowest_id=get_newest_dm_id(), the_API=the_API)
+    unhandled = [dm for dm in all_DMs if not tm.seen_DM(dm.id)]
+    for dm in unhandled:
         handle_dm(dm)
 
 def set_up():
