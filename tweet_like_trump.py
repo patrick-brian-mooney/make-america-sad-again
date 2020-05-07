@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.5
 # -*- coding: utf-8 -*-
 
 """A script that attempts to create tweets that are "similar to" Donald Trump's.
