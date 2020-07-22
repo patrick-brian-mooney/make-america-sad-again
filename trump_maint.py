@@ -11,14 +11,19 @@ file LICENSE.md for details.
 
 import pickle, glob, csv, random
 
-from social_media_auth import Trump_client
+from tweet_like_trump import Trump_client
 # That's an unshared file that contains my authentication constants for various social media platforms.
 
 import social_media as sm           # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/social_media.py
 
-from patrick_logger import log_it   # https://github.com/patrick-brian-mooney/python-personal-library/blob/master/patrick_logger.py
-
 import trump_utils as tu
+
+
+verbosity_level = 2
+
+def log_it(what, debug_level=1):
+    if verbosity_level >= debug_level:
+        print(what)
 
 
 # Miscellaneous convenience functions
